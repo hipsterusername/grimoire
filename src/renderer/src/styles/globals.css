@@ -1,0 +1,235 @@
+@import "tailwindcss";
+
+/* ============================================
+   Tailwind v4 Theme - Static color definitions
+   Dark theme for DungeonMap
+   ============================================ */
+
+@theme {
+  /* Core colors - Dark fantasy theme */
+  --color-background: #16161e;
+  --color-foreground: #e4e4eb;
+  --color-primary: #7c3aed;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #1e1e2a;
+  --color-secondary-foreground: #fafafa;
+  --color-muted: #2a2a3a;
+  --color-muted-foreground: #9898a8;
+  --color-accent: #a78bfa;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #363648;
+  --color-ring: #7c3aed;
+  --color-success: #16a34a;
+  --color-warning: #ca8a04;
+  --color-canvas-bg: #0e0e14;
+  --color-canvas-empty-text: #5a5a6a;
+}
+
+/* ============================================
+   CSS Variables for Konva canvas (runtime)
+   ============================================ */
+
+:root {
+  --canvas-bg: #0e0e14;
+  --canvas-empty-text: #5a5a6a;
+  color-scheme: dark;
+}
+
+/* ============================================
+   Base styles (wrapped in @layer to not override utilities)
+   ============================================ */
+
+@layer base {
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+      Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    overflow: hidden;
+  }
+
+  #root {
+    width: 100vw;
+    height: 100vh;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-ring);
+  }
+
+  input[type="range"]:focus-visible {
+    outline: none;
+  }
+
+  input[type="range"]:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px var(--color-ring);
+  }
+
+  input[type="checkbox"]:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+}
+
+/* ============================================
+   Screen reader only utility
+   ============================================ */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ============================================
+   Reduced motion preference
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================
+   Scrollbar styling
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-muted);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-secondary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted-foreground);
+}
+
+/* ============================================
+   Custom utility classes
+   ============================================ */
+
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* ============================================
+   Text overflow utilities
+   ============================================ */
+
+.text-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ============================================
+   Error states for form elements
+   ============================================ */
+
+.input-error {
+  border-color: var(--color-destructive) !important;
+  box-shadow: 0 0 0 1px var(--color-destructive);
+}
+
+.input-error:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-destructive);
+}
+
+/* ============================================
+   Interactive element minimum sizes (WCAG 2.5.5)
+   ============================================ */
+
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* ============================================
+   Animation utilities
+   ============================================ */
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

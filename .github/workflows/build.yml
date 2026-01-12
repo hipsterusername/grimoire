@@ -1,0 +1,108 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: win
+          - os: macos-latest
+            platform: mac
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run typecheck
+        run: npm run typecheck
+
+      - name: Build application
+        run: npm run build
+
+      # Generate macOS icns icon from PNG files
+      - name: Generate macOS icon
+        if: matrix.platform == 'mac'
+        run: |
+          mkdir -p build/icon.iconset
+          cp build/icons/16x16.png build/icon.iconset/icon_16x16.png
+          cp build/icons/32x32.png build/icon.iconset/icon_16x16@2x.png
+          cp build/icons/32x32.png build/icon.iconset/icon_32x32.png
+          cp build/icons/64x64.png build/icon.iconset/icon_32x32@2x.png
+          cp build/icons/128x128.png build/icon.iconset/icon_128x128.png
+          cp build/icons/256x256.png build/icon.iconset/icon_128x128@2x.png
+          cp build/icons/256x256.png build/icon.iconset/icon_256x256.png
+          cp build/icons/512x512.png build/icon.iconset/icon_256x256@2x.png
+          cp build/icons/512x512.png build/icon.iconset/icon_512x512.png
+          cp build/icons/1024x1024.png build/icon.iconset/icon_512x512@2x.png
+          iconutil -c icns build/icon.iconset -o build/icon.icns
+          rm -rf build/icon.iconset
+
+      - name: Package for ${{ matrix.platform }}
+        run: npm run package:${{ matrix.platform }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dungeonmap-${{ matrix.platform }}
+          path: |
+            dist/*.exe
+            dist/*.msi
+            dist/*.dmg
+            dist/*.zip
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+          if-no-files-found: ignore
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

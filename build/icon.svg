@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="#1a1a2e">
+  <!-- DungeonMap Shield Icon -->
+
+  <!-- Shield outline -->
+  <path d="
+    M50 5
+    Q20 5 10 10
+    Q8 11 8 14
+    L8 45
+    Q8 75 50 95
+    Q92 75 92 45
+    L92 14
+    Q92 11 90 10
+    Q80 5 50 5
+    Z
+    M50 11
+    Q76 11 86 15
+    L86 45
+    Q86 71 50 88
+    Q14 71 14 45
+    L14 15
+    Q24 11 50 11
+    Z
+  "/>
+
+  <!-- Left vertical bar -->
+  <rect x="22" y="18" width="6" height="62"/>
+
+  <!-- Banner/flag top right -->
+  <path d="
+    M62 8
+    L62 32
+    L68 26
+    L74 32
+    L74 8
+    Q68 10 62 8
+    Z
+  "/>
+
+  <!-- Four-pointed star -->
+  <path d="
+    M50 24
+    Q52 38 54 42
+    Q58 43 72 46
+    Q58 49 54 50
+    Q52 54 50 68
+    Q48 54 46 50
+    Q42 49 28 46
+    Q42 43 46 42
+    Q48 38 50 24
+    Z
+  "/>
+
+  <!-- Stem below star with Y split -->
+  <path d="
+    M47 68
+    L47 78
+    L40 78
+    L40 82
+    L47 82
+    L47 86
+    L50 90
+    L53 86
+    L53 82
+    L60 82
+    L60 78
+    L53 78
+    L53 68
+    Z
+  "/>
+</svg>
