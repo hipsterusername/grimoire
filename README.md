@@ -1,7 +1,9 @@
-# Grimoire
-
 <p align="center">
-  <img src="build/icon.svg" alt="Grimoire Logo" width="120" height="120">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="build/logo-banner-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="build/logo-banner-light.svg">
+    <img src="build/logo-banner-light.svg" alt="Grimoire" width="400">
+  </picture>
 </p>
 
 <p align="center">
@@ -18,6 +20,10 @@
 ---
 
 Run tactical encounters without the overhead. Grimoire gives DMs a focused tool for managing battle maps, tokens, and initiative—nothing more, nothing less.
+
+<p align="center">
+  <img src="docs/screenshot.png" alt="Grimoire Screenshot" width="800">
+</p>
 
 ## Features
 

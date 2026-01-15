@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" fill="#ffffff">
+  <!-- Grimoire Logo Banner - Dark Mode (white on transparent) -->
+
+  <g transform="translate(10, 2.5)">
+    <!-- Shield outline -->
+    <path d="
+      M50 15
+      Q15 15 8 20
+      Q5 22 5 27
+      L5 58
+      Q5 92 50 112
+      Q95 92 95 58
+      L95 27
+      Q95 22 92 20
+      Q85 15 50 15
+      Z
+      M50 23
+      Q80 23 88 27
+      L88 58
+      Q88 86 50 104
+      Q12 86 12 58
+      L12 27
+      Q20 23 50 23
+      Z
+    "/>
+
+    <!-- Banner extending above shield -->
+    <path d="
+      M63 4
+      L63 42
+      L72 33
+      L81 42
+      L81 4
+      Q72 7 63 4
+      Z
+    "/>
+
+    <!-- Four-pointed star -->
+    <path d="
+      M50 34
+      Q52 48 54 52
+      Q58 53 74 56
+      Q58 59 54 60
+      Q52 64 50 80
+      Q48 64 46 60
+      Q42 59 26 56
+      Q42 53 46 52
+      Q48 48 50 34
+      Z
+    "/>
+  </g>
+
+  <!-- Stylized "grimoire" text -->
+  <text x="120" y="75"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-size="48"
+        font-weight="400"
+        font-style="italic"
+        letter-spacing="4"
+        fill="#ffffff">
+    grimoire
+  </text>
+</svg>
