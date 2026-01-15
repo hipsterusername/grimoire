@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import type { Asset, AssetLibrary, MonsterTemplate } from '../types'
 import { DEFAULT_ASSET_LIBRARY, LIBRARY_VERSION } from '../types'
+import { useCampaignStore } from './campaign-store'
 
 interface LibraryState {
   library: AssetLibrary
@@ -38,9 +39,16 @@ export const useLibraryStore = create<LibraryState>()(
     error: null,
 
     loadLibrary: async () => {
+      const campaignId = useCampaignStore.getState().activeCampaign?.id
+      if (!campaignId) {
+        // No campaign selected, use empty library
+        set({ library: { ...DEFAULT_ASSET_LIBRARY }, isLoading: false })
+        return
+      }
+
       set({ isLoading: true, error: null })
       try {
-        const library = await window.electronAPI.loadLibrary()
+        const library = await window.electronAPI.loadCampaignLibrary(campaignId)
         if (library && typeof library === 'object') {
           // Migrate if needed
           const typedLibrary = library as AssetLibrary
@@ -62,9 +70,14 @@ export const useLibraryStore = create<LibraryState>()(
     },
 
     saveLibrary: async () => {
+      const campaignId = useCampaignStore.getState().activeCampaign?.id
+      if (!campaignId) {
+        return
+      }
+
       const { library } = get()
       try {
-        await window.electronAPI.saveLibrary(library)
+        await window.electronAPI.saveCampaignLibrary(campaignId, library)
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error'
         set({ error: `Failed to save library: ${message}` })

@@ -137,8 +137,17 @@ export function TemplateEditorModal() {
             maxLength={100}
             placeholder="e.g., Goblin, Orc, Dragon"
             aria-required="true"
-            className="w-full min-h-[44px] px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+            aria-invalid={!name.trim()}
+            aria-describedby={!name.trim() ? `${nameId}-error` : undefined}
+            className={`w-full min-h-[44px] px-3 py-2 bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring ${
+              !name.trim() ? 'border-destructive' : 'border-border'
+            }`}
           />
+          {!name.trim() && (
+            <p id={`${nameId}-error`} className="mt-1 text-xs text-destructive" role="alert">
+              Name is required
+            </p>
+          )}
         </div>
 
         {/* Type and Size */}

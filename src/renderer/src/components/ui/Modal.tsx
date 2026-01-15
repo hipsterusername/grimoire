@@ -139,7 +139,7 @@ export function Modal({
         <div className="flex items-center justify-between p-6 pb-0">
           <h2
             id={titleId.current}
-            className="text-xl font-bold"
+            className="text-xl font-semibold"
           >
             {title}
           </h2>

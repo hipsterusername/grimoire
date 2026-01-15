@@ -3,7 +3,6 @@ export type CanvasTool =
   | 'pan'
   | 'fog-reveal'
   | 'fog-hide'
-  | 'measure'
   | 'add-token'
   | 'presentation-bounds'
 
@@ -24,7 +23,3 @@ export interface CanvasSelection {
   }
 }
 
-export interface BrushSettings {
-  size: number
-  shape: 'circle' | 'square'
-}

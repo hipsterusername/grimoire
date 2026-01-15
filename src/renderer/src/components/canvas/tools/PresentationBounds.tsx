@@ -1,7 +1,8 @@
-import { useRef, useCallback, useEffect } from 'react'
+import { useRef, useCallback, useEffect, useState } from 'react'
 import { Group, Rect, Circle, Line } from 'react-konva'
 import type Konva from 'konva'
 import { usePresentationStore, useCanvasStore } from '../../../stores'
+import type { PresentationBounds as PresentationBoundsType } from '../../../stores/presentation-store'
 
 interface PresentationBoundsProps {
   mapWidth: number
@@ -18,6 +19,12 @@ export function PresentationBounds({ mapWidth, mapHeight }: PresentationBoundsPr
   const view = useCanvasStore((s) => s.view)
   const activeTool = useCanvasStore((s) => s.activeTool)
 
+  // Preview bounds during drag operations for live feedback
+  const [previewBounds, setPreviewBounds] = useState<PresentationBoundsType | null>(null)
+
+  // Use preview bounds during drag, otherwise use store bounds
+  const displayBounds = previewBounds ?? bounds
+
   // Only editable when the presentation-bounds tool is active
   const isEditable = activeTool === 'presentation-bounds'
 
@@ -33,6 +40,22 @@ export function PresentationBounds({ mapWidth, mapHeight }: PresentationBoundsPr
     }
   }, [mapWidth, mapHeight])
 
+  const handleDragMove = useCallback(
+    (e: Konva.KonvaEventObject<DragEvent>) => {
+      e.cancelBubble = true
+      const node = e.target
+      const newX = Math.max(0, Math.min(mapWidth - bounds.width, node.x()))
+      const newY = Math.max(0, Math.min(mapHeight - bounds.height, node.y()))
+
+      setPreviewBounds({
+        ...bounds,
+        x: newX,
+        y: newY
+      })
+    },
+    [bounds, mapWidth, mapHeight]
+  )
+
   const handleDragEnd = useCallback(
     (e: Konva.KonvaEventObject<DragEvent>) => {
       e.cancelBubble = true
@@ -40,11 +63,14 @@ export function PresentationBounds({ mapWidth, mapHeight }: PresentationBoundsPr
       const newX = Math.max(0, Math.min(mapWidth - bounds.width, node.x()))
       const newY = Math.max(0, Math.min(mapHeight - bounds.height, node.y()))
 
-      setBounds({
+      const newBounds = {
         ...bounds,
         x: newX,
         y: newY
-      })
+      }
+
+      setBounds(newBounds)
+      setPreviewBounds(null)
 
       // Snap position
       node.position({ x: newX, y: newY })
@@ -52,95 +78,102 @@ export function PresentationBounds({ mapWidth, mapHeight }: PresentationBoundsPr
     [bounds, mapWidth, mapHeight, setBounds]
   )
 
-  const handleResize = useCallback(
-    (corner: 'nw' | 'ne' | 'se' | 'sw', e: Konva.KonvaEventObject<DragEvent>) => {
-      e.cancelBubble = true
-      const node = e.target
-      const pos = node.position()
-
-      let newBounds = { ...bounds }
-
+  const calculateResizeBounds = useCallback(
+    (corner: 'nw' | 'ne' | 'se' | 'sw', pos: { x: number; y: number }) => {
       switch (corner) {
         case 'nw':
-          newBounds = {
+          return {
             x: Math.max(0, Math.min(pos.x, bounds.x + bounds.width - MIN_SIZE)),
             y: Math.max(0, Math.min(pos.y, bounds.y + bounds.height - MIN_SIZE)),
             width: bounds.x + bounds.width - Math.max(0, Math.min(pos.x, bounds.x + bounds.width - MIN_SIZE)),
             height: bounds.y + bounds.height - Math.max(0, Math.min(pos.y, bounds.y + bounds.height - MIN_SIZE))
           }
-          break
         case 'ne':
-          newBounds = {
+          return {
             x: bounds.x,
             y: Math.max(0, Math.min(pos.y, bounds.y + bounds.height - MIN_SIZE)),
             width: Math.max(MIN_SIZE, Math.min(pos.x - bounds.x, mapWidth - bounds.x)),
             height: bounds.y + bounds.height - Math.max(0, Math.min(pos.y, bounds.y + bounds.height - MIN_SIZE))
           }
-          break
         case 'se':
-          newBounds = {
+          return {
             x: bounds.x,
             y: bounds.y,
             width: Math.max(MIN_SIZE, Math.min(pos.x - bounds.x, mapWidth - bounds.x)),
             height: Math.max(MIN_SIZE, Math.min(pos.y - bounds.y, mapHeight - bounds.y))
           }
-          break
         case 'sw':
-          newBounds = {
+          return {
             x: Math.max(0, Math.min(pos.x, bounds.x + bounds.width - MIN_SIZE)),
             y: bounds.y,
             width: bounds.x + bounds.width - Math.max(0, Math.min(pos.x, bounds.x + bounds.width - MIN_SIZE)),
             height: Math.max(MIN_SIZE, Math.min(pos.y - bounds.y, mapHeight - bounds.y))
           }
-          break
       }
-
-      setBounds(newBounds)
     },
-    [bounds, mapWidth, mapHeight, setBounds]
+    [bounds, mapWidth, mapHeight]
+  )
+
+  const handleResizeMove = useCallback(
+    (corner: 'nw' | 'ne' | 'se' | 'sw', e: Konva.KonvaEventObject<DragEvent>) => {
+      e.cancelBubble = true
+      const pos = e.target.position()
+      setPreviewBounds(calculateResizeBounds(corner, pos))
+    },
+    [calculateResizeBounds]
+  )
+
+  const handleResizeEnd = useCallback(
+    (corner: 'nw' | 'ne' | 'se' | 'sw', e: Konva.KonvaEventObject<DragEvent>) => {
+      e.cancelBubble = true
+      const pos = e.target.position()
+      setBounds(calculateResizeBounds(corner, pos))
+      setPreviewBounds(null)
+    },
+    [calculateResizeBounds, setBounds]
   )
 
   if (!isPresenting) return null
 
   const handlePositions = {
-    nw: { x: bounds.x, y: bounds.y },
-    ne: { x: bounds.x + bounds.width, y: bounds.y },
-    se: { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
-    sw: { x: bounds.x, y: bounds.y + bounds.height }
+    nw: { x: displayBounds.x, y: displayBounds.y },
+    ne: { x: displayBounds.x + displayBounds.width, y: displayBounds.y },
+    se: { x: displayBounds.x + displayBounds.width, y: displayBounds.y + displayBounds.height },
+    sw: { x: displayBounds.x, y: displayBounds.y + displayBounds.height }
   }
 
   return (
     <Group ref={groupRef}>
       {/* Darkened area outside the bounds */}
       {/* Top */}
-      <Rect x={0} y={0} width={mapWidth} height={bounds.y} fill="rgba(0, 0, 0, 0.5)" listening={false} />
+      <Rect x={0} y={0} width={mapWidth} height={displayBounds.y} fill="rgba(0, 0, 0, 0.5)" listening={false} />
       {/* Bottom */}
       <Rect
         x={0}
-        y={bounds.y + bounds.height}
+        y={displayBounds.y + displayBounds.height}
         width={mapWidth}
-        height={mapHeight - bounds.y - bounds.height}
+        height={mapHeight - displayBounds.y - displayBounds.height}
         fill="rgba(0, 0, 0, 0.5)"
         listening={false}
       />
       {/* Left */}
-      <Rect x={0} y={bounds.y} width={bounds.x} height={bounds.height} fill="rgba(0, 0, 0, 0.5)" listening={false} />
+      <Rect x={0} y={displayBounds.y} width={displayBounds.x} height={displayBounds.height} fill="rgba(0, 0, 0, 0.5)" listening={false} />
       {/* Right */}
       <Rect
-        x={bounds.x + bounds.width}
-        y={bounds.y}
-        width={mapWidth - bounds.x - bounds.width}
-        height={bounds.height}
+        x={displayBounds.x + displayBounds.width}
+        y={displayBounds.y}
+        width={mapWidth - displayBounds.x - displayBounds.width}
+        height={displayBounds.height}
         fill="rgba(0, 0, 0, 0.5)"
         listening={false}
       />
 
       {/* Center area - only draggable when editing */}
       <Rect
-        x={bounds.x}
-        y={bounds.y}
-        width={bounds.width}
-        height={bounds.height}
+        x={displayBounds.x}
+        y={displayBounds.y}
+        width={displayBounds.width}
+        height={displayBounds.height}
         fill="transparent"
         stroke="#22d3ee"
         strokeWidth={2 / view.zoom}
@@ -148,33 +181,33 @@ export function PresentationBounds({ mapWidth, mapHeight }: PresentationBoundsPr
         listening={isEditable}
         onDragStart={(e) => { e.cancelBubble = true }}
         onDragEnd={handleDragEnd}
-        onDragMove={(e) => { e.cancelBubble = true }}
+        onDragMove={handleDragMove}
       />
 
       {/* Border decoration */}
       <Line
-        points={[bounds.x + 20, bounds.y, bounds.x, bounds.y, bounds.x, bounds.y + 20]}
+        points={[displayBounds.x + 20, displayBounds.y, displayBounds.x, displayBounds.y, displayBounds.x, displayBounds.y + 20]}
         stroke="#22d3ee"
         strokeWidth={3 / view.zoom}
         lineCap="round"
         listening={false}
       />
       <Line
-        points={[bounds.x + bounds.width - 20, bounds.y, bounds.x + bounds.width, bounds.y, bounds.x + bounds.width, bounds.y + 20]}
+        points={[displayBounds.x + displayBounds.width - 20, displayBounds.y, displayBounds.x + displayBounds.width, displayBounds.y, displayBounds.x + displayBounds.width, displayBounds.y + 20]}
         stroke="#22d3ee"
         strokeWidth={3 / view.zoom}
         lineCap="round"
         listening={false}
       />
       <Line
-        points={[bounds.x + bounds.width, bounds.y + bounds.height - 20, bounds.x + bounds.width, bounds.y + bounds.height, bounds.x + bounds.width - 20, bounds.y + bounds.height]}
+        points={[displayBounds.x + displayBounds.width, displayBounds.y + displayBounds.height - 20, displayBounds.x + displayBounds.width, displayBounds.y + displayBounds.height, displayBounds.x + displayBounds.width - 20, displayBounds.y + displayBounds.height]}
         stroke="#22d3ee"
         strokeWidth={3 / view.zoom}
         lineCap="round"
         listening={false}
       />
       <Line
-        points={[bounds.x + 20, bounds.y + bounds.height, bounds.x, bounds.y + bounds.height, bounds.x, bounds.y + bounds.height - 20]}
+        points={[displayBounds.x + 20, displayBounds.y + displayBounds.height, displayBounds.x, displayBounds.y + displayBounds.height, displayBounds.x, displayBounds.y + displayBounds.height - 20]}
         stroke="#22d3ee"
         strokeWidth={3 / view.zoom}
         lineCap="round"
@@ -193,8 +226,8 @@ export function PresentationBounds({ mapWidth, mapHeight }: PresentationBoundsPr
           strokeWidth={2 / view.zoom}
           draggable
           onDragStart={(e) => { e.cancelBubble = true }}
-          onDragEnd={(e) => handleResize(corner, e)}
-          onDragMove={(e) => { e.cancelBubble = true }}
+          onDragEnd={(e) => handleResizeEnd(corner, e)}
+          onDragMove={(e) => handleResizeMove(corner, e)}
           cursor={corner === 'nw' || corner === 'se' ? 'nwse-resize' : 'nesw-resize'}
         />
       ))}

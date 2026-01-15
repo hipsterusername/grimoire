@@ -19,7 +19,7 @@ export const TOKEN_COLORS = [
 // Just the hex values for simpler usage
 export const TOKEN_COLOR_VALUES = TOKEN_COLORS.map((c) => c.hex)
 
-// Creature sizes from D&D 5E
+// Creature sizes
 export const CREATURE_SIZES = [
   { value: 'tiny', label: 'Tiny', space: '2.5 ft', cells: 0.5 },
   { value: 'small', label: 'Small', space: '5 ft', cells: 1 },
@@ -44,7 +44,7 @@ export const GRID_LIMITS = {
   minHeight: 5,
   maxHeight: 30, // Reduced from 50
   minCellSize: 30,
-  maxCellSize: 80,
+  maxCellSize: 200,
   maxTotalPixels: 2000 * 2000 // 4 megapixels max
 } as const
 
@@ -69,7 +69,6 @@ export const KEYBOARD_SHORTCUTS = {
   pan: { key: 'H', label: 'H' },
   fogReveal: { key: 'R', label: 'R' },
   fogHide: { key: 'F', label: 'F' },
-  measure: { key: 'M', label: 'M' },
   save: { key: 'S', label: 'Ctrl+S', ctrl: true },
   undo: { key: 'Z', label: 'Ctrl+Z', ctrl: true },
   redo: { key: 'Y', label: 'Ctrl+Y', ctrl: true }
@@ -89,7 +88,8 @@ export const TOOLS = [
     label: 'Pan',
     shortcut: 'H',
     icon: 'hand',
-    description: 'Pan around the map'
+    description: 'Pan around the map',
+    hint: 'Hold Space + drag as shortcut'
   },
   {
     id: 'fog-reveal' as const,
@@ -104,13 +104,6 @@ export const TOOLS = [
     shortcut: 'F',
     icon: 'eye-off',
     description: 'Hide areas with fog'
-  },
-  {
-    id: 'measure' as const,
-    label: 'Measure',
-    shortcut: 'M',
-    icon: 'ruler',
-    description: 'Measure distances'
   }
 ] as const
 

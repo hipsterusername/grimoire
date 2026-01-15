@@ -2,12 +2,16 @@ import { create } from 'zustand'
 
 type ModalType =
   | 'new-encounter'
+  | 'new-campaign'
+  | 'campaign-settings'
+  | 'migration'
   | 'token-editor'
   | 'map-upload'
   | 'grid-generator'
   | 'settings'
   | 'token-image-picker'
   | 'template-editor'
+  | 'asset-management'
   | null
 
 type PanelType = 'encounter' | 'tokens' | 'initiative' | 'map' | 'library'

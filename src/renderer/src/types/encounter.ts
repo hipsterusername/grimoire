@@ -92,6 +92,7 @@ export interface FogRevealArea {
   height?: number
   radius?: number
   points?: number[]
+  createdAt: number // Unix timestamp for chronological rendering
 }
 
 export interface FogOfWar {
@@ -99,12 +100,14 @@ export interface FogOfWar {
   color: string
   opacity: number
   revealedAreas: FogRevealArea[]
+  hiddenAreas: FogRevealArea[]
 }
 
 // Encounter Model (Root Document)
 
 export interface Encounter {
   id: string
+  campaignId: string // Reference to parent campaign
   name: string
   description?: string
   map: MapData | null
@@ -149,13 +152,15 @@ export const DEFAULT_FOG_OF_WAR: FogOfWar = {
   enabled: false,
   color: '#000000',
   opacity: 0.95,
-  revealedAreas: []
+  revealedAreas: [],
+  hiddenAreas: []
 }
 
-export function createDefaultEncounter(name: string): Encounter {
+export function createDefaultEncounter(name: string, campaignId: string): Encounter {
   const now = new Date().toISOString()
   return {
     id: crypto.randomUUID(),
+    campaignId,
     name,
     description: '',
     map: null,

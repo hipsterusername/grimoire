@@ -54,31 +54,43 @@ function HpAdjustModal({
     }
   }
 
+  const parsedAmount = parseInt(amount, 10)
+  const hasValidAmount = amount && parsedAmount > 0
+  const previewHp = hasValidAmount
+    ? mode === 'damage'
+      ? Math.max(0, currentHp - parsedAmount)
+      : Math.min(maxHp, currentHp + parsedAmount)
+    : currentHp
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Adjust HP: ${tokenName}`} size="sm">
       <div className="space-y-4">
-        <div className="text-center text-2xl font-bold">
-          {currentHp} / {maxHp} HP
+        {/* Current HP display */}
+        <div className="text-center">
+          <div className="text-3xl font-bold tabular-nums">
+            {currentHp} <span className="text-muted-foreground font-normal">/</span> {maxHp}
+          </div>
+          <div className="text-xs text-muted-foreground mt-0.5">Current HP</div>
         </div>
 
         {/* Mode toggle */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 p-1 bg-muted rounded-lg">
           <button
             onClick={() => setMode('damage')}
-            className={`flex-1 min-h-[44px] px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`flex-1 min-h-[40px] px-4 py-2 rounded-md font-medium transition-all ${
               mode === 'damage'
-                ? 'bg-destructive text-destructive-foreground'
-                : 'bg-muted hover:bg-secondary'
+                ? 'bg-destructive text-destructive-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             Damage
           </button>
           <button
             onClick={() => setMode('heal')}
-            className={`flex-1 min-h-[44px] px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`flex-1 min-h-[40px] px-4 py-2 rounded-md font-medium transition-all ${
               mode === 'heal'
-                ? 'bg-success text-white'
-                : 'bg-muted hover:bg-secondary'
+                ? 'bg-success text-white shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             Heal
@@ -87,7 +99,7 @@ function HpAdjustModal({
 
         {/* Amount input */}
         <div>
-          <label className="block text-sm font-medium mb-1">
+          <label className="block text-sm font-medium mb-1.5">
             {mode === 'damage' ? 'Damage Amount' : 'Heal Amount'}
           </label>
           <input
@@ -98,23 +110,36 @@ function HpAdjustModal({
             onChange={(e) => setAmount(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Enter amount..."
-            className="w-full min-h-[48px] px-4 py-2 text-lg text-center bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+            className="w-full min-h-[48px] px-4 py-2 text-lg text-center font-medium bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring tabular-nums"
           />
         </div>
 
-        {/* Preview */}
-        {amount && parseInt(amount, 10) > 0 && (
-          <div className="text-center text-sm text-muted-foreground">
-            {mode === 'damage' ? (
-              <>New HP: {Math.max(0, currentHp - parseInt(amount, 10))}</>
+        {/* Preview - always visible for context */}
+        <div
+          className={`text-center py-2 px-3 rounded-lg transition-all ${
+            hasValidAmount
+              ? mode === 'damage'
+                ? 'bg-destructive/10 text-destructive'
+                : 'bg-success/10 text-success'
+              : 'bg-muted/50 text-muted-foreground'
+          }`}
+        >
+          <span className="text-sm font-medium">
+            {hasValidAmount ? (
+              <>
+                Result: <span className="text-lg tabular-nums">{previewHp}</span> HP
+                {mode === 'damage' && previewHp === 0 && (
+                  <span className="ml-2 text-xs opacity-75">(Unconscious)</span>
+                )}
+              </>
             ) : (
-              <>New HP: {Math.min(maxHp, currentHp + parseInt(amount, 10))}</>
+              'Enter an amount to preview'
             )}
-          </div>
-        )}
+          </span>
+        </div>
 
         {/* Actions */}
-        <div className="flex gap-3 justify-end">
+        <div className="flex gap-3 justify-end pt-2">
           <button
             onClick={onClose}
             className="min-h-[44px] px-4 py-2 text-sm rounded-lg hover:bg-muted transition-colors"
@@ -123,11 +148,11 @@ function HpAdjustModal({
           </button>
           <button
             onClick={handleApply}
-            disabled={!amount || parseInt(amount, 10) <= 0}
-            className={`min-h-[44px] px-4 py-2 text-sm rounded-lg font-medium transition-opacity disabled:opacity-50 disabled:cursor-not-allowed ${
+            disabled={!hasValidAmount}
+            className={`min-h-[44px] px-6 py-2 text-sm rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
               mode === 'damage'
-                ? 'bg-destructive text-destructive-foreground'
-                : 'bg-success text-white'
+                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                : 'bg-success text-white hover:bg-success/90'
             }`}
           >
             Apply {mode === 'damage' ? 'Damage' : 'Healing'}
@@ -146,6 +171,7 @@ export function TokenPanel() {
 
   const selection = useCanvasStore((s) => s.selection)
   const selectToken = useCanvasStore((s) => s.selectToken)
+  const centerOnToken = useCanvasStore((s) => s.centerOnToken)
   const viewportSize = useCanvasStore((s) => s.viewportSize)
   const view = useCanvasStore((s) => s.view)
   const lastClickedCell = useCanvasStore((s) => s.lastClickedCell)
@@ -239,6 +265,15 @@ export function TokenPanel() {
     setDeleteConfirm({ id, name })
   }
 
+  const handleLocateToken = (tokenId: string) => {
+    const token = encounter?.tokens.find((t) => t.id === tokenId)
+    if (!token || !encounter?.map) return
+
+    const gridSize = encounter.map.gridSettings.gridSize
+    centerOnToken(token.gridX, token.gridY, gridSize, token.size)
+    selectToken(tokenId)
+  }
+
   const confirmDelete = () => {
     if (deleteConfirm) {
       removeToken(deleteConfirm.id)
@@ -252,25 +287,25 @@ export function TokenPanel() {
     <>
       <section className="p-4 border-b border-border" aria-labelledby="tokens-heading">
         <div className="flex items-center justify-between mb-3">
-          <h3 id="tokens-heading" className="font-semibold">Tokens</h3>
-          <div className="flex gap-2" role="group" aria-label="Add token">
+          <h3 id="tokens-heading" className="text-sm font-semibold text-foreground/90">Tokens</h3>
+          <div className="flex gap-1.5" role="group" aria-label="Add token">
             <Tooltip content="Add player character">
               <button
                 onClick={() => handleAddToken(TokenType.PlayerCharacter)}
-                className="min-h-[36px] px-3 py-1.5 text-xs font-medium bg-muted hover:bg-accent/20 border border-border hover:border-accent rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center gap-1.5"
+                className="h-8 px-2.5 text-xs font-medium bg-muted/70 hover:bg-accent/20 border border-border/60 hover:border-accent/50 rounded-md transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center gap-1.5"
                 aria-label="Add player character token"
               >
-                <Icon name="user" size={14} />
+                <Icon name="user" size={13} />
                 <span>Player</span>
               </button>
             </Tooltip>
             <Tooltip content="Add monster">
               <button
                 onClick={() => handleAddToken(TokenType.Monster)}
-                className="min-h-[36px] px-3 py-1.5 text-xs font-medium bg-muted hover:bg-destructive/20 border border-border hover:border-destructive/50 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center gap-1.5"
+                className="h-8 px-2.5 text-xs font-medium bg-muted/70 hover:bg-destructive/15 border border-border/60 hover:border-destructive/40 rounded-md transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center gap-1.5"
                 aria-label="Add monster token"
               >
-                <Icon name="skull" size={14} />
+                <Icon name="skull" size={13} />
                 <span>Monster</span>
               </button>
             </Tooltip>
@@ -278,18 +313,18 @@ export function TokenPanel() {
         </div>
 
         {encounter.tokens.length === 0 ? (
-          <div className="text-center py-8 px-4">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
-              <Icon name="users" size={28} className="text-muted-foreground" />
+          <div className="text-center py-10 px-4">
+            <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
+              <Icon name="users" size={24} className="text-muted-foreground" />
             </div>
-            <p className="text-sm text-foreground font-medium mb-1">No tokens yet</p>
-            <p className="text-xs text-muted-foreground">
-              Add a player or monster to get started
+            <p className="text-sm font-medium mb-0.5">No tokens yet</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Add a player or monster to begin
             </p>
           </div>
         ) : (
           <ul
-            className="space-y-2 max-h-[400px] overflow-y-auto"
+            className="space-y-1.5 max-h-[400px] overflow-y-auto scrollbar-stable"
             role="list"
             aria-label="Token list"
           >
@@ -315,43 +350,53 @@ export function TokenPanel() {
                     tabIndex={0}
                     aria-pressed={isSelected}
                     aria-label={`${token.name}, ${token.type}, ${token.stats.currentHp} of ${token.stats.maxHp} HP, ${isSelected ? 'selected' : 'not selected'}`}
-                    className={`p-3 rounded-lg cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    className={`p-2.5 rounded-lg cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                       isSelected
-                        ? 'bg-primary/20 ring-1 ring-primary'
-                        : 'bg-muted hover:bg-muted/80'
+                        ? 'bg-primary/15 ring-1 ring-primary/60'
+                        : 'bg-muted/60 hover:bg-muted'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      {/* Color indicator */}
+                    {/* Title row with type icon and AC on right */}
+                    <div className="flex items-center gap-2 mb-2">
                       <div
-                        className="w-4 h-4 rounded-full flex-shrink-0"
+                        className="w-3 h-3 rounded-full flex-shrink-0 ring-1 ring-white/10"
                         style={{ backgroundColor: token.color }}
                         aria-hidden="true"
                       />
-
-                      {/* Name and type */}
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate" title={token.name}>
-                          {token.name}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {token.type === TokenType.PlayerCharacter ? 'PC' : token.type === TokenType.NonPlayerCharacter ? 'NPC' : token.type} · {token.size}
-                        </div>
+                      <div className="text-sm font-medium truncate leading-tight flex-1" title={token.name}>
+                        {token.name}
                       </div>
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Tooltip content={token.type === TokenType.PlayerCharacter ? 'Player Character' : token.type === TokenType.NonPlayerCharacter ? 'NPC' : token.type}>
+                          <Icon
+                            name={
+                              token.type === TokenType.PlayerCharacter ? 'user' :
+                              token.type === TokenType.NonPlayerCharacter ? 'users' :
+                              token.type === TokenType.Monster ? 'skull' : 'box'
+                            }
+                            size={14}
+                            aria-label={token.type}
+                          />
+                        </Tooltip>
+                        <span className="text-xs tabular-nums">AC {token.stats.armorClass}</span>
+                      </div>
+                    </div>
 
+                    {/* Controls row: HP on left, action buttons on right */}
+                    <div className="flex items-center justify-between gap-2">
                       {/* HP controls */}
-                      {token.stats.maxHp > 0 && (
-                        <div className="flex items-center gap-1" role="group" aria-label={`HP controls for ${token.name}`}>
+                      {token.stats.maxHp > 0 ? (
+                        <div className="flex items-center" role="group" aria-label={`HP controls for ${token.name}`}>
                           <Tooltip content="Reduce HP by 1">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleQuickHpChange(token.id, -1)
                               }}
-                              className="min-w-[28px] min-h-[28px] text-sm font-bold bg-secondary rounded hover:bg-destructive hover:text-destructive-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              className="w-7 h-7 text-sm font-bold bg-secondary/80 rounded-l-md hover:bg-destructive hover:text-destructive-foreground active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:z-10"
                               aria-label={`Decrease HP for ${token.name}`}
                             >
-                              -
+                              −
                             </button>
                           </Tooltip>
                           <Tooltip content="Click to enter damage/healing amount">
@@ -360,7 +405,7 @@ export function TokenPanel() {
                                 e.stopPropagation()
                                 handleOpenHpModal(token)
                               }}
-                              className={`min-w-[50px] min-h-[28px] px-2 py-1 text-xs font-medium bg-secondary rounded hover:bg-background text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                              className={`min-w-[52px] h-7 px-2 text-xs font-medium bg-secondary/80 hover:bg-secondary text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:z-10 tabular-nums ${
                                 hpStatus === 'critical' ? 'text-destructive' : ''
                               }`}
                               aria-label={`${token.name} HP: ${token.stats.currentHp} of ${token.stats.maxHp}. Click to adjust.`}
@@ -374,24 +419,38 @@ export function TokenPanel() {
                                 e.stopPropagation()
                                 handleQuickHpChange(token.id, 1)
                               }}
-                              className="min-w-[28px] min-h-[28px] text-sm font-bold bg-secondary rounded hover:bg-success hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              className="w-7 h-7 text-sm font-bold bg-secondary/80 rounded-r-md hover:bg-success hover:text-white active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:z-10"
                               aria-label={`Increase HP for ${token.name}`}
                             >
                               +
                             </button>
                           </Tooltip>
                         </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/60">No HP</span>
                       )}
 
-                      {/* Actions */}
+                      {/* Action buttons */}
                       <div className="flex gap-1" role="group" aria-label={`Actions for ${token.name}`}>
+                        <Tooltip content="Locate on map">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleLocateToken(token.id)
+                            }}
+                            className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/80 active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            aria-label={`Locate ${token.name} on map`}
+                          >
+                            <Icon name="crosshair" size={14} />
+                          </button>
+                        </Tooltip>
                         <Tooltip content="Edit token">
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
                               handleEditToken(token.id)
                             }}
-                            className="min-w-[28px] min-h-[28px] p-1 hover:bg-secondary rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/80 active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             aria-label={`Edit ${token.name}`}
                           >
                             <Icon name="edit" size={14} />
@@ -403,7 +462,7 @@ export function TokenPanel() {
                               e.stopPropagation()
                               handleDeleteToken(token.id, token.name)
                             }}
-                            className="min-w-[28px] min-h-[28px] p-1 hover:bg-destructive hover:text-destructive-foreground rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-destructive hover:text-destructive-foreground active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             aria-label={`Delete ${token.name}`}
                           >
                             <Icon name="trash" size={14} />
@@ -415,7 +474,7 @@ export function TokenPanel() {
                     {/* HP bar */}
                     {token.stats.maxHp > 0 && (
                       <div
-                        className="mt-2 h-1.5 bg-secondary rounded overflow-hidden"
+                        className="mt-2 h-1 bg-secondary/40 rounded-full overflow-hidden"
                         role="progressbar"
                         aria-valuenow={token.stats.currentHp}
                         aria-valuemin={0}
@@ -423,14 +482,17 @@ export function TokenPanel() {
                         aria-label={`${token.name} health: ${token.stats.currentHp} of ${token.stats.maxHp}`}
                       >
                         <div
-                          className={`h-full transition-all ${
+                          className={`h-full rounded-full transition-all duration-200 ${
                             hpStatus === 'healthy'
                               ? 'bg-success'
                               : hpStatus === 'injured'
                                 ? 'bg-warning'
                                 : 'bg-destructive'
                           }`}
-                          style={{ width: `${hpPercent * 100}%` }}
+                          style={{
+                            width: `${hpPercent * 100}%`,
+                            transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)' /* ease-out-expo */
+                          }}
                         />
                       </div>
                     )}

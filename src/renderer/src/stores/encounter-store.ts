@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import type { Encounter, Token, MapData, FogRevealArea } from '../types'
 import { createDefaultEncounter, DEFAULT_FOG_OF_WAR } from '../types'
+import { useCampaignStore } from './campaign-store'
 
 interface EncounterState {
   encounter: Encounter | null
@@ -28,12 +29,15 @@ interface EncounterState {
   // Actions - Map
   setMap: (map: MapData) => void
   updateMapGrid: (settings: Partial<MapData['gridSettings']>) => void
+  resizeMap: (width: number, height: number) => void
   clearMap: () => void
 
   // Actions - Fog of War
   toggleFog: (enabled: boolean) => void
-  addFogReveal: (area: Omit<FogRevealArea, 'id'>) => void
+  addFogReveal: (area: Omit<FogRevealArea, 'id' | 'createdAt'>) => void
   removeFogReveal: (id: string) => void
+  addFogHide: (area: Omit<FogRevealArea, 'id' | 'createdAt'>) => void
+  removeFogHide: (id: string) => void
   clearAllFog: () => void
   resetFog: () => void
 
@@ -58,13 +62,19 @@ export const useEncounterStore = create<EncounterState>()(
     recentEncounters: [],
 
     loadEncounter: async (id) => {
+      const campaignId = useCampaignStore.getState().activeCampaign?.id
+      if (!campaignId) {
+        set({ error: 'No active campaign' })
+        return
+      }
+
       set({ isLoading: true, error: null })
       try {
-        const encounter = await window.electronAPI.loadEncounter(id)
+        const encounter = await window.electronAPI.loadCampaignEncounter(campaignId, id)
         if (!encounter) {
           throw new Error('Encounter not found')
         }
-        set({ encounter, isLoading: false, isDirty: false })
+        set({ encounter: encounter as Encounter, isLoading: false, isDirty: false })
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error'
         set({
@@ -78,8 +88,14 @@ export const useEncounterStore = create<EncounterState>()(
       const { encounter } = get()
       if (!encounter) return
 
+      const campaignId = useCampaignStore.getState().activeCampaign?.id
+      if (!campaignId) {
+        set({ error: 'No active campaign' })
+        return
+      }
+
       try {
-        await window.electronAPI.saveEncounter(encounter)
+        await window.electronAPI.saveCampaignEncounter(campaignId, encounter)
         set({ isDirty: false })
         get().fetchRecentEncounters()
       } catch (error) {
@@ -89,7 +105,12 @@ export const useEncounterStore = create<EncounterState>()(
     },
 
     createEncounter: (name) => {
-      const encounter = createDefaultEncounter(name)
+      const campaignId = useCampaignStore.getState().activeCampaign?.id
+      if (!campaignId) {
+        set({ error: 'No active campaign' })
+        return
+      }
+      const encounter = createDefaultEncounter(name, campaignId)
       set({ encounter, isDirty: true })
     },
 
@@ -98,8 +119,14 @@ export const useEncounterStore = create<EncounterState>()(
     },
 
     fetchRecentEncounters: async () => {
+      const campaignId = useCampaignStore.getState().activeCampaign?.id
+      if (!campaignId) {
+        set({ recentEncounters: [] })
+        return
+      }
+
       try {
-        const encounters = await window.electronAPI.listEncounters()
+        const encounters = await window.electronAPI.listCampaignEncounters(campaignId)
         set({ recentEncounters: encounters })
       } catch (error) {
         console.error('Failed to fetch encounters:', error)
@@ -107,8 +134,14 @@ export const useEncounterStore = create<EncounterState>()(
     },
 
     deleteEncounter: async (id) => {
+      const campaignId = useCampaignStore.getState().activeCampaign?.id
+      if (!campaignId) {
+        set({ error: 'No active campaign' })
+        return
+      }
+
       try {
-        await window.electronAPI.deleteEncounter(id)
+        await window.electronAPI.deleteCampaignEncounter(campaignId, id)
         const { encounter } = get()
         if (encounter?.id === id) {
           set({ encounter: null, isDirty: false })
@@ -254,6 +287,25 @@ export const useEncounterStore = create<EncounterState>()(
       })
     },
 
+    resizeMap: (width, height) => {
+      set((state) => {
+        if (!state.encounter?.map) return state
+
+        return {
+          encounter: {
+            ...state.encounter,
+            map: {
+              ...state.encounter.map,
+              imageWidth: width,
+              imageHeight: height,
+              updatedAt: new Date().toISOString()
+            }
+          },
+          isDirty: true
+        }
+      })
+    },
+
     clearMap: () => {
       set((state) => {
         if (!state.encounter) return state
@@ -292,7 +344,8 @@ export const useEncounterStore = create<EncounterState>()(
 
         const newArea: FogRevealArea = {
           ...area,
-          id: crypto.randomUUID()
+          id: crypto.randomUUID(),
+          createdAt: Date.now()
         }
 
         return {
@@ -327,18 +380,14 @@ export const useEncounterStore = create<EncounterState>()(
       })
     },
 
-    clearAllFog: () => {
+    addFogHide: (area) => {
       set((state) => {
-        if (!state.encounter?.map) return state
+        if (!state.encounter) return state
 
-        // Reveal entire map
-        const fullReveal: FogRevealArea = {
+        const newArea: FogRevealArea = {
+          ...area,
           id: crypto.randomUUID(),
-          type: 'rectangle',
-          x: 0,
-          y: 0,
-          width: state.encounter.map.imageWidth,
-          height: state.encounter.map.imageHeight
+          createdAt: Date.now()
         }
 
         return {
@@ -346,7 +395,55 @@ export const useEncounterStore = create<EncounterState>()(
             ...state.encounter,
             fogOfWar: {
               ...state.encounter.fogOfWar,
-              revealedAreas: [fullReveal]
+              hiddenAreas: [...(state.encounter.fogOfWar.hiddenAreas || []), newArea]
+            }
+          },
+          isDirty: true
+        }
+      })
+    },
+
+    removeFogHide: (id) => {
+      set((state) => {
+        if (!state.encounter) return state
+
+        return {
+          encounter: {
+            ...state.encounter,
+            fogOfWar: {
+              ...state.encounter.fogOfWar,
+              hiddenAreas: (state.encounter.fogOfWar.hiddenAreas || []).filter(
+                (a) => a.id !== id
+              )
+            }
+          },
+          isDirty: true
+        }
+      })
+    },
+
+    clearAllFog: () => {
+      set((state) => {
+        if (!state.encounter?.map) return state
+
+        // Reveal entire map and clear hidden areas
+        const fullReveal: FogRevealArea = {
+          id: crypto.randomUUID(),
+          type: 'rectangle',
+          x: 0,
+          y: 0,
+          width: state.encounter.map.imageWidth,
+          height: state.encounter.map.imageHeight,
+          createdAt: Date.now()
+        }
+
+        return {
+          encounter: {
+            ...state.encounter,
+            fogOfWar: {
+              ...state.encounter.fogOfWar,
+              revealedAreas: [fullReveal],
+              hiddenAreas: []
             }
           },
           isDirty: true
@@ -459,6 +556,9 @@ export const useEncounterStore = create<EncounterState>()(
       set((state) => {
         if (!state.encounter) return state
 
+        // Clamp initiative to valid range (0-99)
+        const clampedInitiative = Math.max(0, Math.min(99, Math.round(initiative)))
+
         return {
           encounter: {
             ...state.encounter,
@@ -466,7 +566,7 @@ export const useEncounterStore = create<EncounterState>()(
               t.id === tokenId
                 ? {
                     ...t,
-                    stats: { ...t.stats, initiative },
+                    stats: { ...t.stats, initiative: clampedInitiative },
                     updatedAt: new Date().toISOString()
                   }
                 : t

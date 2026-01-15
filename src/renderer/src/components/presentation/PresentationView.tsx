@@ -342,11 +342,35 @@ interface PresentationFogLayerProps {
 }
 
 /**
- * Renders fog to a canvas at full map size using absolute coordinates.
- * This mirrors the editor's FogOfWarLayer approach for consistency.
- * The Konva Layer's clipping handles viewport cropping.
+ * Helper to draw an area shape to the canvas context
+ */
+function drawFogArea(ctx: CanvasRenderingContext2D, area: FogOfWar['revealedAreas'][0]): void {
+  ctx.beginPath()
+
+  if (area.type === 'circle' && area.radius) {
+    ctx.arc(area.x, area.y, area.radius, 0, Math.PI * 2)
+  } else if (area.type === 'rectangle' && area.width && area.height) {
+    ctx.rect(area.x, area.y, area.width, area.height)
+  } else if (area.type === 'polygon' && area.points) {
+    const points = area.points
+    if (points.length >= 2) {
+      ctx.moveTo(points[0], points[1])
+      for (let i = 2; i < points.length; i += 2) {
+        ctx.lineTo(points[i], points[i + 1])
+      }
+      ctx.closePath()
+    }
+  }
+
+  ctx.fill()
+}
+
+/**
+ * Renders fog to a canvas using chronological ordering.
+ * Areas are processed in timestamp order so the most recent action wins.
+ * This allows reveal → hide → reveal to work correctly.
  *
- * Note: Presentation view uses full opacity (1.0) for hidden areas,
+ * Note: Presentation view uses full opacity (1.0) for fog,
  * unlike the editor which uses semi-transparent fog so the DM can
  * see what's underneath. Players should never see through fog.
  */
@@ -375,30 +399,28 @@ function renderFogToCanvas(
   ctx.globalAlpha = 1.0
   ctx.fillRect(0, 0, mapWidth, mapHeight)
 
-  // Cut out revealed areas using destination-out
-  // Use absolute map coordinates - no offset transformation needed
-  ctx.globalCompositeOperation = 'destination-out'
-  ctx.globalAlpha = 1
+  // Combine revealed and hidden areas with mode indicator, then sort chronologically
+  const allAreas: Array<{ area: FogOfWar['revealedAreas'][0]; mode: 'reveal' | 'hide' }> = [
+    ...fogOfWar.revealedAreas.map((area) => ({ area, mode: 'reveal' as const })),
+    ...(fogOfWar.hiddenAreas || []).map((area) => ({ area, mode: 'hide' as const }))
+  ]
 
-  fogOfWar.revealedAreas.forEach((area) => {
-    ctx.beginPath()
+  // Sort by createdAt timestamp (oldest first, so newest wins)
+  allAreas.sort((a, b) => (a.area.createdAt || 0) - (b.area.createdAt || 0))
 
-    if (area.type === 'circle' && area.radius) {
-      ctx.arc(area.x, area.y, area.radius, 0, Math.PI * 2)
-    } else if (area.type === 'rectangle' && area.width && area.height) {
-      ctx.rect(area.x, area.y, area.width, area.height)
-    } else if (area.type === 'polygon' && area.points) {
-      const points = area.points
-      if (points.length >= 2) {
-        ctx.moveTo(points[0], points[1])
-        for (let i = 2; i < points.length; i += 2) {
-          ctx.lineTo(points[i], points[i + 1])
-        }
-        ctx.closePath()
-      }
+  // Process areas in chronological order
+  allAreas.forEach(({ area, mode }) => {
+    if (mode === 'reveal') {
+      // Cut out revealed area
+      ctx.globalCompositeOperation = 'destination-out'
+      ctx.globalAlpha = 1
+    } else {
+      // Paint fog back for hidden area (full opacity for players)
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.fillStyle = fogOfWar.color
+      ctx.globalAlpha = 1.0
     }
-
-    ctx.fill()
+    drawFogArea(ctx, area)
   })
 
   // Reset context state

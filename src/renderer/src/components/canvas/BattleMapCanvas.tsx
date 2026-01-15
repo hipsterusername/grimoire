@@ -1,13 +1,15 @@
 import { useRef, useCallback, useEffect, useMemo, useState } from 'react'
-import { Stage, Layer, Rect, Text } from 'react-konva'
+import { Stage, Layer, Rect } from 'react-konva'
 import type Konva from 'konva'
-import { useEncounterStore, useCanvasStore, usePresentationStore } from '../../stores'
+import { useEncounterStore, useCanvasStore, usePresentationStore, useUIStore } from '../../stores'
 import { MapLayer } from './layers/MapLayer'
 import { GridLayer } from './layers/GridLayer'
 import { TokenLayer } from './layers/TokenLayer'
 import { FogOfWarLayer } from './layers/FogOfWarLayer'
 import { FogBrush } from './tools/FogBrush'
 import { PresentationBounds } from './tools/PresentationBounds'
+import { MovementMeasure } from './tools/MovementMeasure'
+import { Icon } from '../ui/Icon'
 
 interface BattleMapCanvasProps {
   width: number
@@ -28,13 +30,14 @@ export function BattleMapCanvas({ width, height }: BattleMapCanvasProps) {
 
   // Get theme colors for canvas (use base CSS variables for runtime values)
   const canvasBg = useCSSVariable('--canvas-bg', '#e5e7eb')
-  const emptyTextColor = useCSSVariable('--canvas-empty-text', '#9ca3af')
 
   const encounter = useEncounterStore((s) => s.encounter)
   const updateViewState = useEncounterStore((s) => s.updateViewState)
 
   const { view, activeTool, isPanning, viewportSize } = useCanvasStore()
-  const { setZoom, setPan, setPanning, clearSelection, resetZoom, setLastClickedCell } = useCanvasStore()
+  const { setZoom, setPan, setPanning, clearSelection, resetZoom, setLastClickedCell, zoomToFit } = useCanvasStore()
+
+  const openModal = useUIStore((s) => s.openModal)
 
   // Track space key and middle mouse for alternative panning
   const [isSpaceHeld, setIsSpaceHeld] = useState(false)
@@ -120,34 +123,57 @@ export function BattleMapCanvas({ width, height }: BattleMapCanvasProps) {
     [clearSelection, encounter?.map?.gridSettings, view.panX, view.panY, view.zoom, setLastClickedCell]
   )
 
-  // Handle mouse down for middle button panning
+  // Handle mouse down for middle button panning (on stage)
   const handleMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       if (e.evt.button === 1) {
-        // Middle mouse button
+        // Middle mouse button - prevent default auto-scroll behavior
         e.evt.preventDefault()
-        setIsMiddleMouseHeld(true)
-        setPanning(true)
       }
     },
-    [setPanning]
+    []
   )
 
-  // Handle mouse up for middle button panning
-  const handleMouseUp = useCallback(
-    (e: Konva.KonvaEventObject<MouseEvent>) => {
-      if (e.evt.button === 1) {
+  // Global mouse handlers for middle button panning
+  // These must be global because the mouse can be released outside the canvas
+  useEffect(() => {
+    const handleGlobalMouseDown = (e: MouseEvent) => {
+      if (e.button === 1) {
+        // Middle mouse button - prevent auto-scroll and start panning
+        e.preventDefault()
+        setIsMiddleMouseHeld(true)
+        setPanning(true)
+
+        // Programmatically start the drag since the stage isn't draggable yet
+        // when this mousedown fires (React hasn't re-rendered with isDraggable=true)
+        const stage = stageRef.current
+        if (stage) {
+          stage.startDrag()
+        }
+      }
+    }
+
+    const handleGlobalMouseUp = (e: MouseEvent) => {
+      if (e.button === 1) {
         // Middle mouse button released
         setIsMiddleMouseHeld(false)
         setPanning(false)
         const stage = stageRef.current
         if (stage) {
+          stage.stopDrag()
           setPan(stage.x(), stage.y())
         }
       }
-    },
-    [setPanning, setPan]
-  )
+    }
+
+    window.addEventListener('mousedown', handleGlobalMouseDown)
+    window.addEventListener('mouseup', handleGlobalMouseUp)
+
+    return () => {
+      window.removeEventListener('mousedown', handleGlobalMouseDown)
+      window.removeEventListener('mouseup', handleGlobalMouseUp)
+    }
+  }, [setPanning, setPan])
 
   // Keyboard handlers for space and Ctrl+R
   useEffect(() => {
@@ -202,13 +228,21 @@ export function BattleMapCanvas({ width, height }: BattleMapCanvasProps) {
     }
   }, [])
 
-  // Load saved view state
+  // Fit map to view on load, or center empty canvas
   useEffect(() => {
-    if (encounter?.viewState) {
-      setZoom(encounter.viewState.zoom)
-      setPan(encounter.viewState.panX, encounter.viewState.panY)
+    if (encounter?.map && width > 0 && height > 0) {
+      // Has a map - fit it to view so the full map is visible
+      zoomToFit(width, height, encounter.map.imageWidth, encounter.map.imageHeight)
+    } else if (encounter && !encounter.map && width > 0 && height > 0) {
+      // No map - center the default canvas area
+      const defaultWidth = 1000
+      const defaultHeight = 800
+      const panX = (width - defaultWidth) / 2
+      const panY = (height - defaultHeight) / 2
+      setZoom(1)
+      setPan(panX, panY)
     }
-  }, [encounter?.id])
+  }, [encounter?.id, encounter?.map, width, height, setZoom, setPan, zoomToFit])
 
   // Get presentation sync function
   const syncState = usePresentationStore((s) => s.syncState)
@@ -267,6 +301,7 @@ export function BattleMapCanvas({ width, height }: BattleMapCanvasProps) {
   const isFogTool = activeTool === 'fog-reveal' || activeTool === 'fog-hide'
 
   return (
+    <div className="relative" style={{ width, height }}>
     <Stage
       ref={stageRef}
       width={width}
@@ -282,7 +317,6 @@ export function BattleMapCanvas({ width, height }: BattleMapCanvasProps) {
       onClick={handleStageClick}
       onTap={handleStageClick}
       onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
       style={{ cursor: isDraggable ? (isPanning ? 'grabbing' : 'grab') : 'default' }}
     >
       {/* Background layer */}
@@ -309,6 +343,9 @@ export function BattleMapCanvas({ width, height }: BattleMapCanvasProps) {
       {/* Tokens layer */}
       <TokenLayer tokens={encounter.tokens} gridSize={gridSize} />
 
+      {/* Movement measurement overlay */}
+      <MovementMeasure gridSize={gridSize} />
+
       {/* Fog of War layer */}
       <FogOfWarLayer
         fogOfWar={encounter.fogOfWar}
@@ -327,28 +364,37 @@ export function BattleMapCanvas({ width, height }: BattleMapCanvasProps) {
           stageRef={stageRef as React.RefObject<Konva.Stage>}
         />
       )}
-
-      {/* Empty state overlay */}
-      {!encounter.map && (
-        <Layer listening={false}>
-          <Rect
-            x={0}
-            y={0}
-            width={mapWidth}
-            height={mapHeight}
-            fill="transparent"
-          />
-          <Text
-            x={mapWidth / 2 - 150}
-            y={mapHeight / 2 - 20}
-            text="Upload a map or generate a grid to get started"
-            fontSize={16}
-            fill={emptyTextColor}
-            width={300}
-            align="center"
-          />
-        </Layer>
-      )}
     </Stage>
+
+    {/* Empty state overlay - HTML for interactivity */}
+    {!encounter.map && (
+      <div
+        className="absolute inset-0 flex items-center justify-center pointer-events-none"
+        aria-live="polite"
+      >
+        <div className="pointer-events-auto text-center">
+          <p className="text-muted-foreground mb-6 text-sm tracking-wide uppercase">
+            No map loaded
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => openModal('map-upload')}
+              className="group relative px-5 py-3 bg-secondary hover:bg-secondary/80 border border-border hover:border-primary/50 rounded-lg transition-all duration-200 flex items-center gap-3"
+            >
+              <Icon name="upload" size={18} className="text-muted-foreground group-hover:text-primary transition-colors" />
+              <span className="text-sm font-medium">Upload a map</span>
+            </button>
+            <button
+              onClick={() => openModal('grid-generator')}
+              className="group relative px-5 py-3 bg-secondary hover:bg-secondary/80 border border-border hover:border-primary/50 rounded-lg transition-all duration-200 flex items-center gap-3"
+            >
+              <Icon name="grid" size={18} className="text-muted-foreground group-hover:text-primary transition-colors" />
+              <span className="text-sm font-medium">Generate a grid</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type ReactNode } from 'react'
+import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react'
 
 interface TooltipProps {
   content: ReactNode
@@ -18,28 +18,57 @@ export function Tooltip({
   const [isVisible, setIsVisible] = useState(false)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const triggerRef = useRef<HTMLDivElement>(null)
+  const isHoveredRef = useRef(false)
 
-  const showTooltip = () => {
-    timeoutRef.current = setTimeout(() => {
-      setIsVisible(true)
-    }, delay)
-  }
-
-  const hideTooltip = () => {
+  const clearPendingTimeout = useCallback(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
       timeoutRef.current = null
     }
-    setIsVisible(false)
-  }
+  }, [])
 
+  const hideTooltip = useCallback(() => {
+    clearPendingTimeout()
+    isHoveredRef.current = false
+    setIsVisible(false)
+  }, [clearPendingTimeout])
+
+  const showTooltip = useCallback(() => {
+    isHoveredRef.current = true
+    clearPendingTimeout()
+    timeoutRef.current = setTimeout(() => {
+      // Only show if still hovered
+      if (isHoveredRef.current) {
+        setIsVisible(true)
+      }
+    }, delay)
+  }, [delay, clearPendingTimeout])
+
+  // Hide tooltip on scroll, resize, or any pointer down outside
+  useEffect(() => {
+    if (!isVisible) return
+
+    const handleHide = () => hideTooltip()
+
+    // Hide on scroll (any scrollable ancestor)
+    window.addEventListener('scroll', handleHide, true)
+    window.addEventListener('resize', handleHide)
+    // Hide on any click/touch elsewhere
+    window.addEventListener('pointerdown', handleHide)
+
+    return () => {
+      window.removeEventListener('scroll', handleHide, true)
+      window.removeEventListener('resize', handleHide)
+      window.removeEventListener('pointerdown', handleHide)
+    }
+  }, [isVisible, hideTooltip])
+
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
+      clearPendingTimeout()
     }
-  }, [])
+  }, [clearPendingTimeout])
 
   const positionClasses = {
     top: 'bottom-full left-1/2 -translate-x-1/2 mb-2',
@@ -52,8 +81,8 @@ export function Tooltip({
     <div
       ref={triggerRef}
       className="relative inline-flex"
-      onMouseEnter={showTooltip}
-      onMouseLeave={hideTooltip}
+      onPointerEnter={showTooltip}
+      onPointerLeave={hideTooltip}
       onFocus={showTooltip}
       onBlur={hideTooltip}
     >
@@ -62,14 +91,16 @@ export function Tooltip({
       {isVisible && (
         <div
           role="tooltip"
-          className={`absolute z-50 px-2 py-1.5 text-xs font-medium bg-foreground text-background rounded shadow-lg whitespace-nowrap pointer-events-none ${positionClasses[position]}`}
+          className={`absolute z-50 px-2 py-1.5 text-xs font-medium bg-foreground text-background rounded shadow-lg pointer-events-none whitespace-nowrap ${positionClasses[position]}`}
         >
-          <span>{content}</span>
-          {shortcut && (
-            <kbd className="ml-2 px-1.5 py-0.5 bg-black/20 rounded text-[10px] font-mono">
-              {shortcut}
-            </kbd>
-          )}
+          <div className="flex items-center gap-2">
+            <span>{content}</span>
+            {shortcut && (
+              <kbd className="shrink-0 px-1.5 py-0.5 bg-black/20 rounded text-[10px] font-mono">
+                {shortcut}
+              </kbd>
+            )}
+          </div>
         </div>
       )}
     </div>

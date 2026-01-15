@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useCallback } from 'react'
 import { Group, Circle, Text, Image } from 'react-konva'
 import useImage from 'use-image'
 import type Konva from 'konva'
@@ -22,17 +22,20 @@ export function Token({ token, gridSize, isSelected, onSelect }: TokenProps) {
   const activeTool = useCanvasStore((s) => s.activeTool)
   const isPanning = useCanvasStore((s) => s.isPanning)
   const setDragging = useCanvasStore((s) => s.setDragging)
+  const startMovementMeasure = useCanvasStore((s) => s.startMovementMeasure)
+  const updateMovementMeasure = useCanvasStore((s) => s.updateMovementMeasure)
+  const clearMovementMeasure = useCanvasStore((s) => s.clearMovementMeasure)
   const setEditingToken = useUIStore((s) => s.setEditingToken)
   const openModal = useUIStore((s) => s.openModal)
   const library = useLibraryStore((s) => s.library)
 
   // Check if a cell is occupied by another token (not this one)
-  const isCellOccupied = (gridX: number, gridY: number) => {
+  const isCellOccupied = useCallback((gridX: number, gridY: number) => {
     return tokens.some((t) => t.id !== token.id && t.gridX === gridX && t.gridY === gridY)
-  }
+  }, [tokens, token.id])
 
   // Find the nearest empty cell using spiral search
-  const findEmptyCell = (startX: number, startY: number): { gridX: number; gridY: number } => {
+  const findEmptyCell = useCallback((startX: number, startY: number): { gridX: number; gridY: number } => {
     if (!isCellOccupied(startX, startY)) {
       return { gridX: startX, gridY: startY }
     }
@@ -71,7 +74,7 @@ export function Token({ token, gridSize, isSelected, onSelect }: TokenProps) {
     }
 
     return { gridX: startX + 1, gridY: startY }
-  }
+  }, [isCellOccupied])
 
   // Get image URL from asset library if assetId is present, otherwise use legacy imageUrl
   const getImageUrl = () => {
@@ -102,14 +105,25 @@ export function Token({ token, gridSize, isSelected, onSelect }: TokenProps) {
   // Center offset for non-1x1 tokens
   const offset = token.size === CreatureSize.Tiny ? gridSize * 0.25 : 0
 
-  const handleDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
+  const handleDragStart = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     e.cancelBubble = true
     setDragging(true)
-  }
+    // Start tracking movement from the token's current grid position
+    startMovementMeasure(token.id, token.gridX, token.gridY)
+  }, [setDragging, startMovementMeasure, token.id, token.gridX, token.gridY])
 
-  const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
+  const handleDragMove = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
+    const node = e.target
+    // Calculate which grid cell the token is currently over
+    const currentGridX = Math.round(node.x() / gridSize)
+    const currentGridY = Math.round(node.y() / gridSize)
+    updateMovementMeasure(currentGridX, currentGridY)
+  }, [gridSize, updateMovementMeasure])
+
+  const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     e.cancelBubble = true
     setDragging(false)
+    clearMovementMeasure()
     const node = e.target
 
     // Snap to grid
@@ -127,7 +141,7 @@ export function Token({ token, gridSize, isSelected, onSelect }: TokenProps) {
       x: newGridX * gridSize,
       y: newGridY * gridSize
     })
-  }
+  }, [setDragging, clearMovementMeasure, gridSize, findEmptyCell, moveToken, token.id])
 
   const handleClick = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
     e.cancelBubble = true
@@ -164,6 +178,7 @@ export function Token({ token, gridSize, isSelected, onSelect }: TokenProps) {
       y={y}
       draggable={isDraggable}
       onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onClick={handleClick}
       onTap={handleClick}

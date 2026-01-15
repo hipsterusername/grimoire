@@ -1,5 +1,14 @@
 import { create } from 'zustand'
-import type { CanvasTool, CanvasViewState, CanvasSelection, BrushSettings } from '../types'
+import type { CanvasTool, CanvasViewState, CanvasSelection, CreatureSize } from '../types'
+import { CREATURE_SIZES } from '../lib/constants'
+
+export interface MovementMeasure {
+  startGridX: number
+  startGridY: number
+  currentGridX: number
+  currentGridY: number
+  tokenId: string
+}
 
 interface CanvasState {
   // View
@@ -8,7 +17,6 @@ interface CanvasState {
 
   // Tool
   activeTool: CanvasTool
-  brushSettings: BrushSettings
 
   // Selection
   selection: CanvasSelection | null
@@ -21,6 +29,9 @@ interface CanvasState {
   isDragging: boolean
   isPanning: boolean
 
+  // Movement measurement during token drag
+  movementMeasure: MovementMeasure | null
+
   // Actions
   setViewportSize: (width: number, height: number) => void
   setZoom: (zoom: number) => void
@@ -32,8 +43,6 @@ interface CanvasState {
   setPan: (x: number, y: number) => void
 
   setTool: (tool: CanvasTool) => void
-  setBrushSize: (size: number) => void
-  setBrushShape: (shape: 'circle' | 'square') => void
 
   setSelection: (selection: CanvasSelection | null) => void
   selectToken: (tokenId: string) => void
@@ -46,6 +55,14 @@ interface CanvasState {
   setPanning: (panning: boolean) => void
 
   setLastClickedCell: (gridX: number, gridY: number) => void
+
+  // Movement measurement
+  startMovementMeasure: (tokenId: string, gridX: number, gridY: number) => void
+  updateMovementMeasure: (gridX: number, gridY: number) => void
+  clearMovementMeasure: () => void
+
+  // Center view on token
+  centerOnToken: (gridX: number, gridY: number, gridSize: number, tokenSize: CreatureSize) => void
 }
 
 const ZOOM_MIN = 0.1
@@ -56,12 +73,12 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   view: { zoom: 1, panX: 0, panY: 0 },
   viewportSize: { width: 800, height: 600 },
   activeTool: 'select',
-  brushSettings: { size: 50, shape: 'circle' },
   selection: null,
   hoveredTokenId: null,
   lastClickedCell: null,
   isDragging: false,
   isPanning: false,
+  movementMeasure: null,
 
   setViewportSize: (width, height) =>
     set({ viewportSize: { width, height } }),
@@ -119,16 +136,6 @@ export const useCanvasStore = create<CanvasState>((set) => ({
 
   setTool: (activeTool) => set({ activeTool, selection: null }),
 
-  setBrushSize: (size) =>
-    set((state) => ({
-      brushSettings: { ...state.brushSettings, size: Math.max(10, Math.min(200, size)) }
-    })),
-
-  setBrushShape: (shape) =>
-    set((state) => ({
-      brushSettings: { ...state.brushSettings, shape }
-    })),
-
   setSelection: (selection) => set({ selection }),
 
   selectToken: (tokenId) =>
@@ -160,5 +167,56 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   setDragging: (isDragging) => set({ isDragging }),
   setPanning: (isPanning) => set({ isPanning }),
 
-  setLastClickedCell: (gridX, gridY) => set({ lastClickedCell: { gridX, gridY } })
+  setLastClickedCell: (gridX, gridY) => set({ lastClickedCell: { gridX, gridY } }),
+
+  startMovementMeasure: (tokenId, gridX, gridY) =>
+    set({
+      movementMeasure: {
+        tokenId,
+        startGridX: gridX,
+        startGridY: gridY,
+        currentGridX: gridX,
+        currentGridY: gridY
+      }
+    }),
+
+  updateMovementMeasure: (gridX, gridY) =>
+    set((state) => {
+      if (!state.movementMeasure) return state
+      return {
+        movementMeasure: {
+          ...state.movementMeasure,
+          currentGridX: gridX,
+          currentGridY: gridY
+        }
+      }
+    }),
+
+  clearMovementMeasure: () => set({ movementMeasure: null }),
+
+  centerOnToken: (gridX, gridY, gridSize, tokenSize) =>
+    set((state) => {
+      // Get the token's size in grid units
+      const sizeInfo = CREATURE_SIZES.find((s) => s.value === tokenSize)
+      const tokenGridUnits = sizeInfo?.cells ?? 1
+
+      // Calculate token center in canvas coordinates
+      const tokenCenterX = (gridX + tokenGridUnits / 2) * gridSize
+      const tokenCenterY = (gridY + tokenGridUnits / 2) * gridSize
+
+      // Calculate pan to center the token in the viewport
+      const { width, height } = state.viewportSize
+      const { zoom } = state.view
+
+      const panX = width / 2 - tokenCenterX * zoom
+      const panY = height / 2 - tokenCenterY * zoom
+
+      return {
+        view: {
+          ...state.view,
+          panX,
+          panY
+        }
+      }
+    })
 }))

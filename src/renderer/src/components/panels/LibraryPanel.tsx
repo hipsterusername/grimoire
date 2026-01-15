@@ -264,6 +264,7 @@ export function LibraryPanel() {
                     disabled={!encounter}
                     className="min-w-[32px] min-h-[32px] p-1.5 rounded hover:bg-background transition-colors disabled:opacity-50"
                     title="Add to encounter"
+                    aria-label={`Add ${template.name} to encounter`}
                   >
                     <Icon name="plus" size={16} />
                   </button>
@@ -271,6 +272,7 @@ export function LibraryPanel() {
                     onClick={() => handleDuplicate(template.id)}
                     className="min-w-[32px] min-h-[32px] p-1.5 rounded hover:bg-background transition-colors"
                     title="Duplicate template"
+                    aria-label={`Duplicate ${template.name}`}
                   >
                     <Icon name="copy" size={16} />
                   </button>
@@ -278,6 +280,7 @@ export function LibraryPanel() {
                     onClick={() => handleEdit(template.id)}
                     className="min-w-[32px] min-h-[32px] p-1.5 rounded hover:bg-background transition-colors"
                     title="Edit template"
+                    aria-label={`Edit ${template.name}`}
                   >
                     <Icon name="edit" size={16} />
                   </button>
@@ -285,6 +288,7 @@ export function LibraryPanel() {
                     onClick={() => handleDelete(template.id)}
                     className="min-w-[32px] min-h-[32px] p-1.5 rounded hover:bg-background text-destructive transition-colors"
                     title="Delete template"
+                    aria-label={`Delete ${template.name}`}
                   >
                     <Icon name="trash" size={16} />
                   </button>

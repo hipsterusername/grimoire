@@ -1,39 +1,183 @@
 @import "tailwindcss";
 
 /* ============================================
-   Tailwind v4 Theme - Static color definitions
-   Dark theme for DungeonMap
+   Tailwind v4 Theme - Maps to CSS variables for runtime theming
    ============================================ */
 
 @theme {
-  /* Core colors - Dark fantasy theme */
-  --color-background: #16161e;
-  --color-foreground: #e4e4eb;
-  --color-primary: #7c3aed;
-  --color-primary-foreground: #ffffff;
-  --color-secondary: #1e1e2a;
-  --color-secondary-foreground: #fafafa;
-  --color-muted: #2a2a3a;
-  --color-muted-foreground: #9898a8;
-  --color-accent: #a78bfa;
-  --color-destructive: #dc2626;
-  --color-destructive-foreground: #ffffff;
-  --color-border: #363648;
-  --color-ring: #7c3aed;
-  --color-success: #16a34a;
-  --color-warning: #ca8a04;
-  --color-canvas-bg: #0e0e14;
-  --color-canvas-empty-text: #5a5a6a;
+  /* Core colors - Reference CSS variables for runtime switching */
+  --color-background: var(--theme-background);
+  --color-foreground: var(--theme-foreground);
+  --color-primary: var(--theme-primary);
+  --color-primary-foreground: var(--theme-primary-foreground);
+  --color-secondary: var(--theme-secondary);
+  --color-secondary-foreground: var(--theme-secondary-foreground);
+  --color-muted: var(--theme-muted);
+  --color-muted-foreground: var(--theme-muted-foreground);
+  --color-accent: var(--theme-accent);
+  --color-accent-foreground: var(--theme-accent-foreground);
+  --color-destructive: var(--theme-destructive);
+  --color-destructive-foreground: var(--theme-destructive-foreground);
+  --color-border: var(--theme-border);
+  --color-ring: var(--theme-ring);
+  --color-success: var(--theme-success);
+  --color-warning: var(--theme-warning);
+  --color-canvas-bg: var(--theme-canvas-bg);
+  --color-canvas-empty-text: var(--theme-canvas-empty-text);
+
+  /* Theme accents */
+  --color-gold: var(--theme-gold);
+  --color-gold-dim: var(--theme-gold-dim);
+  --color-arcane: var(--theme-arcane);
+  --color-arcane-glow: var(--theme-arcane-glow);
 }
 
 /* ============================================
-   CSS Variables for Konva canvas (runtime)
+   Theme Definitions - Dark Mystical (default)
+   Purple and gold arcane theme
    ============================================ */
 
-:root {
-  --canvas-bg: #0e0e14;
-  --canvas-empty-text: #5a5a6a;
+:root,
+:root[data-theme="mystical"] {
+  --theme-background: #0f0d13;
+  --theme-foreground: #e8e4ed;
+  --theme-primary: #8b5cf6;
+  --theme-primary-foreground: #faf5ff;
+  --theme-secondary: #18141f;
+  --theme-secondary-foreground: #f5f3f7;
+  --theme-muted: #241e2d;
+  --theme-muted-foreground: #a89eb5;
+  --theme-accent: #c4a962;
+  --theme-accent-foreground: #1a1612;
+  --theme-destructive: #a62c2c;
+  --theme-destructive-foreground: #fef2f2;
+  --theme-border: #2e2638;
+  --theme-ring: #a78bfa;
+  --theme-success: #2d8a4e;
+  --theme-warning: #b8860b;
+  --theme-canvas-bg: #0a080d;
+  --theme-canvas-empty-text: #4a4256;
+  --theme-gold: #c4a962;
+  --theme-gold-dim: #8b7a4a;
+  --theme-arcane: #9d4edd;
+  --theme-arcane-glow: rgba(157, 78, 221, 0.3);
+
+  /* Konva canvas variables */
+  --canvas-bg: #0a080d;
+  --canvas-empty-text: #4a4256;
+  --gold: #c4a962;
+  --gold-dim: #8b7a4a;
+  --arcane-glow: rgba(157, 78, 221, 0.3);
+
   color-scheme: dark;
+}
+
+/* ============================================
+   Theme: Forest
+   Green and amber woodland theme
+   ============================================ */
+
+:root[data-theme="forest"] {
+  --theme-background: #0d1410;
+  --theme-foreground: #e4ede8;
+  --theme-primary: #22c55e;
+  --theme-primary-foreground: #f0fdf4;
+  --theme-secondary: #141f18;
+  --theme-secondary-foreground: #f3f7f5;
+  --theme-muted: #1e2d24;
+  --theme-muted-foreground: #9eb5a8;
+  --theme-accent: #d97706;
+  --theme-accent-foreground: #1a1612;
+  --theme-destructive: #a62c2c;
+  --theme-destructive-foreground: #fef2f2;
+  --theme-border: #263830;
+  --theme-ring: #4ade80;
+  --theme-success: #22c55e;
+  --theme-warning: #d97706;
+  --theme-canvas-bg: #080d0a;
+  --theme-canvas-empty-text: #425648;
+  --theme-gold: #d97706;
+  --theme-gold-dim: #92510a;
+  --theme-arcane: #22c55e;
+  --theme-arcane-glow: rgba(34, 197, 94, 0.3);
+
+  --canvas-bg: #080d0a;
+  --canvas-empty-text: #425648;
+  --gold: #d97706;
+  --gold-dim: #92510a;
+  --arcane-glow: rgba(34, 197, 94, 0.3);
+}
+
+/* ============================================
+   Theme: Ocean
+   Blue and coral deep sea theme
+   ============================================ */
+
+:root[data-theme="ocean"] {
+  --theme-background: #0c1219;
+  --theme-foreground: #e4eaed;
+  --theme-primary: #0ea5e9;
+  --theme-primary-foreground: #f0f9ff;
+  --theme-secondary: #141a1f;
+  --theme-secondary-foreground: #f3f5f7;
+  --theme-muted: #1e2830;
+  --theme-muted-foreground: #9eb0b8;
+  --theme-accent: #f97316;
+  --theme-accent-foreground: #1a1612;
+  --theme-destructive: #a62c2c;
+  --theme-destructive-foreground: #fef2f2;
+  --theme-border: #263038;
+  --theme-ring: #38bdf8;
+  --theme-success: #2d8a6e;
+  --theme-warning: #f97316;
+  --theme-canvas-bg: #080c10;
+  --theme-canvas-empty-text: #425058;
+  --theme-gold: #f97316;
+  --theme-gold-dim: #9a4a12;
+  --theme-arcane: #0ea5e9;
+  --theme-arcane-glow: rgba(14, 165, 233, 0.3);
+
+  --canvas-bg: #080c10;
+  --canvas-empty-text: #425058;
+  --gold: #f97316;
+  --gold-dim: #9a4a12;
+  --arcane-glow: rgba(14, 165, 233, 0.3);
+}
+
+/* ============================================
+   Theme: Blood Moon
+   Red and gold ominous theme
+   ============================================ */
+
+:root[data-theme="blood-moon"] {
+  --theme-background: #130d0d;
+  --theme-foreground: #ede4e4;
+  --theme-primary: #dc2626;
+  --theme-primary-foreground: #fef2f2;
+  --theme-secondary: #1f1414;
+  --theme-secondary-foreground: #f7f3f3;
+  --theme-muted: #2d1e1e;
+  --theme-muted-foreground: #b59e9e;
+  --theme-accent: #fbbf24;
+  --theme-accent-foreground: #1a1612;
+  --theme-destructive: #7f1d1d;
+  --theme-destructive-foreground: #fef2f2;
+  --theme-border: #382626;
+  --theme-ring: #f87171;
+  --theme-success: #2d8a4e;
+  --theme-warning: #fbbf24;
+  --theme-canvas-bg: #0d0808;
+  --theme-canvas-empty-text: #584242;
+  --theme-gold: #fbbf24;
+  --theme-gold-dim: #a17c18;
+  --theme-arcane: #dc2626;
+  --theme-arcane-glow: rgba(220, 38, 38, 0.3);
+
+  --canvas-bg: #0d0808;
+  --canvas-empty-text: #584242;
+  --gold: #fbbf24;
+  --gold-dim: #a17c18;
+  --arcane-glow: rgba(220, 38, 38, 0.3);
 }
 
 /* ============================================
@@ -42,8 +186,7 @@
 
 @layer base {
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-      Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background-color: var(--color-background);
     color: var(--color-foreground);
     overflow: hidden;
@@ -125,25 +268,40 @@
 }
 
 /* ============================================
-   Scrollbar styling
+   Scrollbar styling - Mystical theme
    ============================================ */
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-muted);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-secondary);
-  border-radius: 4px;
+  background: var(--color-border);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-muted-foreground);
+  background: var(--gold-dim);
+}
+
+/* Scrollbar corner */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Stable scrollbar gutter - prevents layout shift */
+.scrollbar-stable {
+  scrollbar-gutter: stable;
+}
+
+/* Overlay scrollbar - doesn't take space */
+.scrollbar-overlay {
+  overflow: overlay;
 }
 
 /* ============================================
@@ -232,4 +390,31 @@
 
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ============================================
+   Slide-in animations for toolbar elements
+   ============================================ */
+
+@keyframes slide-in-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-in {
+  animation-fill-mode: both;
+}
+
+.slide-in-from-left-2 {
+  animation-name: slide-in-from-left;
+}
+
+.duration-150 {
+  animation-duration: 150ms;
 }

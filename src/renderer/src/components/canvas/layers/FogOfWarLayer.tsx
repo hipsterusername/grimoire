@@ -10,8 +10,33 @@ interface FogOfWarLayerProps {
 }
 
 /**
- * Renders fog to a canvas element.
- * The fog is drawn as a solid overlay with revealed areas cut out.
+ * Helper to draw an area shape to the canvas context
+ */
+function drawArea(ctx: CanvasRenderingContext2D, area: FogOfWar['revealedAreas'][0]): void {
+  ctx.beginPath()
+
+  if (area.type === 'circle' && area.radius) {
+    ctx.arc(area.x, area.y, area.radius, 0, Math.PI * 2)
+  } else if (area.type === 'rectangle' && area.width && area.height) {
+    ctx.rect(area.x, area.y, area.width, area.height)
+  } else if (area.type === 'polygon' && area.points) {
+    const points = area.points
+    if (points.length >= 2) {
+      ctx.moveTo(points[0], points[1])
+      for (let i = 2; i < points.length; i += 2) {
+        ctx.lineTo(points[i], points[i + 1])
+      }
+      ctx.closePath()
+    }
+  }
+
+  ctx.fill()
+}
+
+/**
+ * Renders fog to a canvas element using chronological ordering.
+ * Areas are processed in timestamp order so the most recent action wins.
+ * This allows reveal → hide → reveal to work correctly.
  */
 function renderFogToCanvas(
   canvas: HTMLCanvasElement,
@@ -37,30 +62,28 @@ function renderFogToCanvas(
   ctx.globalAlpha = fogOfWar.opacity
   ctx.fillRect(0, 0, mapWidth, mapHeight)
 
-  // Cut out revealed areas using destination-out composite operation
-  // This makes the revealed areas fully transparent (so map shows through)
-  ctx.globalCompositeOperation = 'destination-out'
-  ctx.globalAlpha = 1
+  // Combine revealed and hidden areas with mode indicator, then sort chronologically
+  const allAreas: Array<{ area: FogOfWar['revealedAreas'][0]; mode: 'reveal' | 'hide' }> = [
+    ...fogOfWar.revealedAreas.map((area) => ({ area, mode: 'reveal' as const })),
+    ...(fogOfWar.hiddenAreas || []).map((area) => ({ area, mode: 'hide' as const }))
+  ]
 
-  fogOfWar.revealedAreas.forEach((area) => {
-    ctx.beginPath()
+  // Sort by createdAt timestamp (oldest first, so newest wins)
+  allAreas.sort((a, b) => (a.area.createdAt || 0) - (b.area.createdAt || 0))
 
-    if (area.type === 'circle' && area.radius) {
-      ctx.arc(area.x, area.y, area.radius, 0, Math.PI * 2)
-    } else if (area.type === 'rectangle' && area.width && area.height) {
-      ctx.rect(area.x, area.y, area.width, area.height)
-    } else if (area.type === 'polygon' && area.points) {
-      const points = area.points
-      if (points.length >= 2) {
-        ctx.moveTo(points[0], points[1])
-        for (let i = 2; i < points.length; i += 2) {
-          ctx.lineTo(points[i], points[i + 1])
-        }
-        ctx.closePath()
-      }
+  // Process areas in chronological order
+  allAreas.forEach(({ area, mode }) => {
+    if (mode === 'reveal') {
+      // Cut out revealed area
+      ctx.globalCompositeOperation = 'destination-out'
+      ctx.globalAlpha = 1
+    } else {
+      // Paint fog back for hidden area
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.fillStyle = fogOfWar.color
+      ctx.globalAlpha = fogOfWar.opacity
     }
-
-    ctx.fill()
+    drawArea(ctx, area)
   })
 
   // Reset context state

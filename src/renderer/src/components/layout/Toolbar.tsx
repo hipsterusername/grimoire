@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useEncounterStore, useCanvasStore, useUIStore, usePresentationStore } from '../../stores'
+import { useEncounterStore, useCanvasStore, usePresentationStore, useCampaignStore, useUIStore } from '../../stores'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/Tooltip'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
@@ -8,6 +8,91 @@ import type { CanvasTool } from '../../types'
 
 const FOG_TOOLS: CanvasTool[] = ['fog-reveal', 'fog-hide']
 
+/** Toolbar group wrapper with subtle background and refined spacing */
+function ToolGroup({
+  children,
+  label,
+  variant = 'default'
+}: {
+  children: React.ReactNode
+  label: string
+  variant?: 'default' | 'compact'
+}) {
+  return (
+    <div
+      className={`flex items-center rounded-lg ${
+        variant === 'compact' ? 'gap-0.5 p-0.5' : 'gap-1 p-1'
+      } bg-background/40`}
+      role="group"
+      aria-label={label}
+    >
+      {children}
+    </div>
+  )
+}
+
+/** Small icon button for tool palette */
+function ToolButton({
+  icon,
+  label,
+  shortcut,
+  hint,
+  isActive,
+  isDisabled,
+  onClick,
+  size = 'default',
+  activeColor = 'primary'
+}: {
+  icon: string
+  label: string
+  shortcut?: string
+  hint?: string
+  isActive?: boolean
+  isDisabled?: boolean
+  onClick: () => void
+  size?: 'default' | 'small'
+  activeColor?: 'primary' | 'accent' | 'cyan'
+}) {
+  const sizeClasses = size === 'small'
+    ? 'w-7 h-7'
+    : 'w-8 h-8'
+
+  const activeClasses = {
+    primary: 'bg-primary text-primary-foreground shadow-sm shadow-primary/30',
+    accent: 'bg-accent text-accent-foreground shadow-sm shadow-accent/30',
+    cyan: 'bg-cyan-600 text-white shadow-sm shadow-cyan-500/30'
+  }
+
+  // Build tooltip content with optional hint
+  const tooltipContent = isDisabled
+    ? `${label} (Fog disabled)`
+    : hint
+      ? <span>{label}<span className="block text-[10px] opacity-70 mt-0.5">{hint}</span></span>
+      : label
+
+  return (
+    <Tooltip
+      content={tooltipContent}
+      shortcut={shortcut}
+    >
+      <button
+        onClick={onClick}
+        className={`${sizeClasses} flex items-center justify-center rounded-md transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-secondary ${
+          isActive
+            ? activeClasses[activeColor]
+            : isDisabled
+              ? 'text-muted-foreground/30 hover:text-muted-foreground/50 hover:bg-muted/30'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+        }`}
+        aria-label={`${label}${shortcut ? ` (${shortcut})` : ''}${hint ? ` - ${hint}` : ''}${isDisabled ? ' - Fog of War disabled' : ''}`}
+        aria-pressed={isActive}
+      >
+        <Icon name={icon} size={size === 'small' ? 14 : 16} />
+      </button>
+    </Tooltip>
+  )
+}
+
 export function Toolbar() {
   const encounter = useEncounterStore((s) => s.encounter)
   const isDirty = useEncounterStore((s) => s.isDirty)
@@ -15,33 +100,29 @@ export function Toolbar() {
   const closeEncounter = useEncounterStore((s) => s.closeEncounter)
   const toggleFog = useEncounterStore((s) => s.toggleFog)
 
+  const activeCampaign = useCampaignStore((s) => s.activeCampaign)
+
   const activeTool = useCanvasStore((s) => s.activeTool)
   const setTool = useCanvasStore((s) => s.setTool)
   const zoomIn = useCanvasStore((s) => s.zoomIn)
   const zoomOut = useCanvasStore((s) => s.zoomOut)
   const resetZoom = useCanvasStore((s) => s.resetZoom)
   const view = useCanvasStore((s) => s.view)
-  const brushSettings = useCanvasStore((s) => s.brushSettings)
-  const setBrushSize = useCanvasStore((s) => s.setBrushSize)
-  const setBrushShape = useCanvasStore((s) => s.setBrushShape)
-
-  const openModal = useUIStore((s) => s.openModal)
 
   const isPresenting = usePresentationStore((s) => s.isPresenting)
   const startPresentation = usePresentationStore((s) => s.startPresentation)
   const stopPresentation = usePresentationStore((s) => s.stopPresentation)
 
+  const openModal = useUIStore((s) => s.openModal)
+
   const [isSaving, setIsSaving] = useState(false)
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
   const [showFogEnableConfirm, setShowFogEnableConfirm] = useState(false)
   const [pendingFogTool, setPendingFogTool] = useState<CanvasTool | null>(null)
-  const [showOverflowMenu, setShowOverflowMenu] = useState(false)
   const [isCompact, setIsCompact] = useState(false)
   const toolbarRef = useRef<HTMLDivElement>(null)
-  const overflowMenuRef = useRef<HTMLDivElement>(null)
 
   const isFogEnabled = encounter?.fogOfWar?.enabled ?? false
-  const isFogToolActive = FOG_TOOLS.includes(activeTool)
 
   // Responsive check
   useEffect(() => {
@@ -54,19 +135,6 @@ export function Toolbar() {
     window.addEventListener('resize', checkWidth)
     return () => window.removeEventListener('resize', checkWidth)
   }, [])
-
-  // Close overflow menu on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (overflowMenuRef.current && !overflowMenuRef.current.contains(e.target as Node)) {
-        setShowOverflowMenu(false)
-      }
-    }
-    if (showOverflowMenu) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showOverflowMenu])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -88,8 +156,7 @@ export function Toolbar() {
         v: 'select',
         h: 'pan',
         r: 'fog-reveal',
-        f: 'fog-hide',
-        m: 'measure'
+        f: 'fog-hide'
       }
 
       const tool = toolShortcuts[e.key.toLowerCase()]
@@ -169,301 +236,171 @@ export function Toolbar() {
     setPendingFogTool(null)
   }
 
-  const renderToolButton = (tool: (typeof TOOLS)[number]) => {
-    const isActive = activeTool === tool.id
-    const isFogTool = FOG_TOOLS.includes(tool.id)
-    const isDisabled = isFogTool && !isFogEnabled
-
-    return (
-      <Tooltip
-        key={tool.id}
-        content={isDisabled ? `${tool.label} - Click to enable Fog of War` : tool.label}
-        shortcut={tool.shortcut}
-      >
-        <button
-          onClick={() => handleToolClick(tool.id)}
-          className={`relative min-w-[40px] min-h-[40px] p-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-secondary ${
-            isActive
-              ? 'bg-primary text-primary-foreground'
-              : isDisabled
-              ? 'text-muted-foreground/40 hover:bg-muted/50 hover:text-muted-foreground/60'
-              : 'hover:bg-muted text-foreground'
-          }`}
-          aria-label={`${tool.label} tool (${tool.shortcut})${isDisabled ? ' - Fog of War disabled, click to enable' : ''}`}
-          aria-pressed={isActive}
-        >
-          <Icon name={tool.icon} size={18} />
-          {/* Disabled indicator for fog tools */}
-          {isDisabled && (
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-muted-foreground/30 rounded-full flex items-center justify-center">
-              <span className="w-1.5 h-0.5 bg-muted-foreground/60 rounded-full transform -rotate-45" />
-            </span>
-          )}
-        </button>
-      </Tooltip>
-    )
-  }
+  // Group tools into navigation vs fog
+  const navigationTools = TOOLS.filter(t => !FOG_TOOLS.includes(t.id))
+  const fogTools = TOOLS.filter(t => FOG_TOOLS.includes(t.id))
 
   return (
     <>
       <div
         ref={toolbarRef}
-        className="flex items-center h-12 px-3 bg-secondary border-b border-border gap-2"
+        className="flex items-center h-11 px-2 bg-secondary/80 backdrop-blur-sm border-b border-border/60 gap-3"
         role="toolbar"
         aria-label="Battle map controls"
       >
-        {/* Back button */}
-        <Tooltip content="Close encounter">
-          <button
-            onClick={handleClose}
-            className="min-h-[40px] px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center gap-2"
-            aria-label="Close encounter and return to home"
-          >
-            <Icon name="arrow-left" size={16} />
-            {!isCompact && <span>Back</span>}
-          </button>
-        </Tooltip>
+        {/* === Left section: Navigation & Document === */}
+        <div className="flex items-center gap-2">
+          {/* Back button */}
+          <Tooltip content={activeCampaign ? `Back to ${activeCampaign.name}` : 'Close encounter'}>
+            <button
+              onClick={handleClose}
+              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={activeCampaign ? `Return to ${activeCampaign.name}` : 'Close encounter'}
+            >
+              <Icon name="arrow-left" size={16} />
+            </button>
+          </Tooltip>
 
-        {/* Encounter name */}
-        <div className="flex items-center gap-2 min-w-0 flex-shrink">
-          <span
-            className="font-medium truncate max-w-[150px] text-sm"
-            title={encounter?.name}
-          >
-            {encounter?.name}
-          </span>
-          {isDirty && (
+          {/* Document info */}
+          <div className="flex items-center gap-1.5 pl-1 pr-2 border-l border-border/40">
             <span
-              className="text-xs text-warning font-medium"
-              aria-live="polite"
+              className="text-sm font-medium text-foreground/90 truncate max-w-[140px]"
+              title={encounter?.name}
             >
-              {isCompact ? '*' : 'Unsaved'}
+              {encounter?.name}
             </span>
-          )}
-        </div>
-
-        {/* Save button */}
-        <Tooltip content="Save encounter" shortcut="Ctrl+S">
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="min-h-[40px] px-3 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center gap-2"
-            aria-label={isDirty ? 'Save encounter (unsaved changes)' : 'Save encounter'}
-          >
-            {isSaving ? (
-              <Icon name="spinner" size={16} className="animate-spin" />
-            ) : (
-              <Icon name="save" size={16} />
+            {isDirty && (
+              <span
+                className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"
+                title="Unsaved changes"
+                aria-live="polite"
+              />
             )}
-            {!isCompact && <span>Save</span>}
-          </button>
-        </Tooltip>
+          </div>
 
-        <div className="w-px h-6 bg-border" role="separator" aria-hidden="true" />
-
-        {/* Tools */}
-        <div className="flex items-center gap-1" role="group" aria-label="Drawing tools">
-          {TOOLS.map(renderToolButton)}
-        </div>
-
-        {/* Fog Brush Controls - only visible when fog tool is active */}
-        {isFogToolActive && isFogEnabled && (
-          <>
-            <div className="w-px h-6 bg-border" role="separator" aria-hidden="true" />
-
-            <div className="flex items-center gap-1" role="group" aria-label="Brush settings">
-              {/* Brush shape toggle */}
-              <Tooltip content="Circle brush - click and drag to paint">
-                <button
-                  onClick={() => setBrushShape('circle')}
-                  className={`min-w-[36px] min-h-[36px] p-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                    brushSettings.shape === 'circle'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'hover:bg-muted text-foreground'
-                  }`}
-                  aria-label="Circle brush - click and drag to paint"
-                  aria-pressed={brushSettings.shape === 'circle'}
-                >
-                  <Icon name="circle" size={16} />
-                </button>
-              </Tooltip>
-
-              <Tooltip content="Rectangle - drag to draw area">
-                <button
-                  onClick={() => setBrushShape('square')}
-                  className={`min-w-[36px] min-h-[36px] p-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                    brushSettings.shape === 'square'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'hover:bg-muted text-foreground'
-                  }`}
-                  aria-label="Rectangle - drag to draw area"
-                  aria-pressed={brushSettings.shape === 'square'}
-                >
-                  <Icon name="square" size={16} />
-                </button>
-              </Tooltip>
-
-              {/* Brush size slider - only for circle mode */}
-              {brushSettings.shape === 'circle' && (
-                <div className="flex items-center gap-2 px-2">
-                  <Icon name="brush" size={14} className="text-muted-foreground" />
-                  <input
-                    type="range"
-                    min="10"
-                    max="200"
-                    value={brushSettings.size}
-                    onChange={(e) => setBrushSize(Number(e.target.value))}
-                    className="w-20 h-1.5 bg-muted rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer"
-                    aria-label={`Brush size: ${brushSettings.size}px`}
-                  />
-                  <span className="text-xs text-muted-foreground min-w-[32px]">{brushSettings.size}px</span>
-                </div>
+          {/* Save button - subtle when clean, prominent when dirty */}
+          <Tooltip content={isDirty ? 'Save changes' : 'Saved'} shortcut="Ctrl+S">
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className={`h-7 px-2.5 text-xs font-medium rounded-md transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center gap-1.5 ${
+                isDirty
+                  ? 'bg-accent/90 text-accent-foreground hover:bg-accent shadow-sm shadow-accent/20'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+              } disabled:opacity-50 disabled:cursor-wait`}
+              aria-label={isDirty ? 'Save encounter (unsaved changes)' : 'Save encounter'}
+            >
+              {isSaving ? (
+                <Icon name="spinner" size={12} className="animate-spin" />
+              ) : (
+                <Icon name="save" size={12} />
               )}
-            </div>
-          </>
-        )}
-
-        <div className="w-px h-6 bg-border" role="separator" aria-hidden="true" />
-
-        {/* Zoom controls */}
-        <div className="flex items-center gap-1" role="group" aria-label="Zoom controls">
-          <Tooltip content="Zoom out">
-            <button
-              onClick={zoomOut}
-              className="min-w-[36px] min-h-[36px] p-2 rounded-lg hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Zoom out"
-            >
-              <Icon name="zoom-out" size={16} />
-            </button>
-          </Tooltip>
-
-          <Tooltip content="Reset zoom to 100%">
-            <button
-              onClick={resetZoom}
-              className="min-h-[36px] px-2 py-1 text-xs font-medium rounded-lg hover:bg-muted transition-colors min-w-[50px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label={`Current zoom: ${Math.round(view.zoom * 100)}%. Click to reset to 100%`}
-            >
-              {Math.round(view.zoom * 100)}%
-            </button>
-          </Tooltip>
-
-          <Tooltip content="Zoom in">
-            <button
-              onClick={zoomIn}
-              className="min-w-[36px] min-h-[36px] p-2 rounded-lg hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Zoom in"
-            >
-              <Icon name="zoom-in" size={16} />
+              {!isCompact && <span>{isDirty ? 'Save' : 'Saved'}</span>}
             </button>
           </Tooltip>
         </div>
 
-        <div className="w-px h-6 bg-border" role="separator" aria-hidden="true" />
+        {/* === Center section: Tools === */}
+        <div className="flex items-center gap-2 mx-auto">
+          {/* Navigation tools */}
+          <ToolGroup label="Navigation tools" variant="compact">
+            {navigationTools.map((tool) => (
+              <ToolButton
+                key={tool.id}
+                icon={tool.icon}
+                label={tool.label}
+                shortcut={tool.shortcut}
+                hint={'hint' in tool ? tool.hint : undefined}
+                isActive={activeTool === tool.id}
+                onClick={() => handleToolClick(tool.id)}
+              />
+            ))}
+          </ToolGroup>
 
-        {/* Presentation mode */}
-        <Tooltip content={isPresenting ? 'Stop presenting' : 'Start presenting'}>
-          <button
-            onClick={handlePresentationToggle}
-            className={`min-h-[40px] px-3 py-2 text-sm rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center gap-2 ${
-              isPresenting
-                ? 'bg-cyan-600 text-white hover:bg-cyan-700'
-                : 'hover:bg-muted'
-            }`}
-            aria-label={isPresenting ? 'Stop presenting' : 'Start presenting'}
-            aria-pressed={isPresenting}
-          >
-            <Icon name={isPresenting ? 'monitor-off' : 'monitor'} size={16} />
-            {!isCompact && <span>{isPresenting ? 'Stop' : 'Present'}</span>}
-          </button>
-        </Tooltip>
+          {/* Fog tools */}
+          <ToolGroup label="Fog of war tools" variant="compact">
+            {fogTools.map((tool) => (
+              <ToolButton
+                key={tool.id}
+                icon={tool.icon}
+                label={tool.label}
+                shortcut={tool.shortcut}
+                isActive={activeTool === tool.id}
+                isDisabled={!isFogEnabled}
+                onClick={() => handleToolClick(tool.id)}
+              />
+            ))}
+          </ToolGroup>
 
-        {/* Presentation bounds tool - only visible when presenting */}
-        {isPresenting && (
-          <Tooltip content="Edit presentation frame">
-            <button
-              onClick={() => setTool(activeTool === 'presentation-bounds' ? 'select' : 'presentation-bounds')}
-              className={`min-w-[40px] min-h-[40px] p-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                activeTool === 'presentation-bounds'
-                  ? 'bg-cyan-600 text-white'
-                  : 'hover:bg-muted text-foreground'
-              }`}
-              aria-label="Edit presentation frame"
-              aria-pressed={activeTool === 'presentation-bounds'}
-            >
-              <Icon name="frame" size={18} />
-            </button>
-          </Tooltip>
-        )}
+        </div>
 
-        <div className="flex-1" />
-
-        {/* Map actions - responsive */}
-        {isCompact ? (
-          <div className="relative" ref={overflowMenuRef}>
-            <Tooltip content="More actions">
+        {/* === Right section: View controls & Presentation === */}
+        <div className="flex items-center gap-2">
+          {/* Zoom controls */}
+          <ToolGroup label="Zoom controls" variant="compact">
+            <ToolButton
+              icon="zoom-out"
+              label="Zoom out"
+              onClick={zoomOut}
+              size="small"
+            />
+            <Tooltip content="Reset zoom">
               <button
-                onClick={() => setShowOverflowMenu(!showOverflowMenu)}
-                className="min-w-[40px] min-h-[40px] p-2 rounded-lg hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label="More actions"
-                aria-expanded={showOverflowMenu}
-                aria-haspopup="menu"
+                onClick={resetZoom}
+                className="h-7 px-1.5 min-w-[42px] text-[11px] tabular-nums font-medium text-muted-foreground hover:text-foreground rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`Zoom: ${Math.round(view.zoom * 100)}%. Click to reset`}
               >
-                <Icon name="menu" size={18} />
+                {Math.round(view.zoom * 100)}%
+              </button>
+            </Tooltip>
+            <ToolButton
+              icon="zoom-in"
+              label="Zoom in"
+              onClick={zoomIn}
+              size="small"
+            />
+          </ToolGroup>
+
+          {/* Presentation controls */}
+          <div className="flex items-center gap-1 pl-2 border-l border-border/40">
+            <Tooltip content={isPresenting ? 'End presentation' : 'Present to players'}>
+              <button
+                onClick={handlePresentationToggle}
+                className={`h-8 px-3 text-xs font-medium rounded-md transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center gap-1.5 ${
+                  isPresenting
+                    ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-500/30 hover:bg-cyan-500'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                }`}
+                aria-label={isPresenting ? 'Stop presenting' : 'Start presenting'}
+                aria-pressed={isPresenting}
+              >
+                <Icon name={isPresenting ? 'monitor-off' : 'monitor'} size={14} />
+                {!isCompact && <span>{isPresenting ? 'Live' : 'Present'}</span>}
               </button>
             </Tooltip>
 
-            {showOverflowMenu && (
-              <div
-                className="absolute right-0 top-full mt-1 py-1 bg-secondary border border-border rounded-lg shadow-lg z-50 min-w-[160px]"
-                role="menu"
-              >
-                <button
-                  onClick={() => {
-                    openModal('map-upload')
-                    setShowOverflowMenu(false)
-                  }}
-                  className="w-full px-4 py-2 text-sm text-left hover:bg-muted flex items-center gap-3"
-                  role="menuitem"
-                >
-                  <Icon name="upload" size={16} />
-                  Upload Map
-                </button>
-                <button
-                  onClick={() => {
-                    openModal('grid-generator')
-                    setShowOverflowMenu(false)
-                  }}
-                  className="w-full px-4 py-2 text-sm text-left hover:bg-muted flex items-center gap-3"
-                  role="menuitem"
-                >
-                  <Icon name="grid" size={16} />
-                  Generate Grid
-                </button>
-              </div>
+            {isPresenting && (
+              <ToolButton
+                icon="frame"
+                label="Edit frame"
+                isActive={activeTool === 'presentation-bounds'}
+                onClick={() => setTool(activeTool === 'presentation-bounds' ? 'select' : 'presentation-bounds')}
+                activeColor="cyan"
+              />
             )}
           </div>
-        ) : (
-          <div className="flex items-center gap-2" role="group" aria-label="Map actions">
-            <Tooltip content="Upload a battle map image">
-              <button
-                onClick={() => openModal('map-upload')}
-                className="min-h-[40px] px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center gap-2"
-              >
-                <Icon name="upload" size={16} />
-                Upload Map
-              </button>
-            </Tooltip>
-            <Tooltip content="Generate a simple grid map">
-              <button
-                onClick={() => openModal('grid-generator')}
-                className="min-h-[40px] px-3 py-2 text-sm rounded-lg hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center gap-2"
-              >
-                <Icon name="grid" size={16} />
-                Generate Grid
-              </button>
-            </Tooltip>
-          </div>
-        )}
+
+          {/* Settings */}
+          <Tooltip content="Settings">
+            <button
+              onClick={() => openModal('settings')}
+              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Open settings"
+            >
+              <Icon name="settings" size={16} />
+            </button>
+          </Tooltip>
+        </div>
       </div>
 
       {/* Close confirmation dialog */}

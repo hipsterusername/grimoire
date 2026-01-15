@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useId } from 'react'
 import { Modal } from './Modal'
 
 interface ConfirmDialogProps {
@@ -23,6 +23,7 @@ export function ConfirmDialog({
   onCancel
 }: ConfirmDialogProps) {
   const confirmButtonRef = useRef<HTMLButtonElement>(null)
+  const messageId = useId()
 
   // Focus the confirm button when dialog opens
   useEffect(() => {
@@ -47,8 +48,9 @@ export function ConfirmDialog({
       title={title}
       size="sm"
       role="alertdialog"
+      ariaDescribedBy={messageId}
     >
-      <p className="text-muted-foreground mb-6">{message}</p>
+      <p id={messageId} className="text-muted-foreground mb-6">{message}</p>
 
       <div className="flex gap-3 justify-end">
         <button

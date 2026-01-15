@@ -138,28 +138,28 @@ export function Sidebar() {
             <p className="text-xs mt-2">Click the buttons above to show panels.</p>
           </div>
         ) : (
-          <>
+          <div className="divide-y divide-border">
             {activePanels.includes('tokens') && (
-              <section aria-label="Tokens panel">
+              <div className="bg-background/30">
                 <TokenPanel />
-              </section>
+              </div>
             )}
             {activePanels.includes('initiative') && (
-              <section aria-label="Initiative panel">
+              <div className="bg-background/30">
                 <InitiativePanel />
-              </section>
+              </div>
             )}
             {activePanels.includes('map') && (
-              <section aria-label="Map panel">
+              <div className="bg-background/30">
                 <MapPanel />
-              </section>
+              </div>
             )}
             {activePanels.includes('library') && (
-              <section aria-label="Library panel">
+              <div className="bg-background/30">
                 <LibraryPanel />
-              </section>
+              </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </aside>

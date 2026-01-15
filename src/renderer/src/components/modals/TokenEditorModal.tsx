@@ -155,12 +155,12 @@ export function TokenEditorModal() {
       title="Edit Token"
       size="lg"
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         {/* Name */}
         <div>
-          <label htmlFor={nameId} className="block text-sm font-medium mb-1">
+          <label htmlFor={nameId} className="block text-sm font-medium mb-1.5">
             Name
-            <span className="text-destructive ml-1" aria-hidden="true">*</span>
+            <span className="text-destructive ml-0.5" aria-hidden="true">*</span>
           </label>
           <input
             id={nameId}
@@ -169,19 +169,28 @@ export function TokenEditorModal() {
             onChange={(e) => setName(e.target.value)}
             maxLength={100}
             aria-required="true"
-            className="w-full min-h-[44px] px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+            aria-invalid={!name.trim()}
+            aria-describedby={!name.trim() ? `${nameId}-error` : undefined}
+            className={`w-full min-h-[44px] px-3 py-2 bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring transition-colors ${
+              !name.trim() ? 'border-destructive' : 'border-border'
+            }`}
           />
+          {!name.trim() && (
+            <p id={`${nameId}-error`} className="mt-1.5 text-xs text-destructive" role="alert">
+              Name is required
+            </p>
+          )}
         </div>
 
         {/* Type and Size */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label htmlFor={typeId} className="block text-sm font-medium mb-1">Type</label>
+            <label htmlFor={typeId} className="block text-sm font-medium mb-1.5">Type</label>
             <select
               id={typeId}
               value={type}
               onChange={(e) => setType(e.target.value as TokenType)}
-              className="w-full min-h-[44px] px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full min-h-[44px] px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring transition-colors cursor-pointer"
             >
               {TYPE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -191,12 +200,12 @@ export function TokenEditorModal() {
             </select>
           </div>
           <div>
-            <label htmlFor={sizeId} className="block text-sm font-medium mb-1">Size</label>
+            <label htmlFor={sizeId} className="block text-sm font-medium mb-1.5">Size</label>
             <select
               id={sizeId}
               value={size}
               onChange={(e) => setSize(e.target.value as CreatureSize)}
-              className="w-full min-h-[44px] px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full min-h-[44px] px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring transition-colors cursor-pointer"
             >
               {SIZE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -213,16 +222,16 @@ export function TokenEditorModal() {
         {/* Token Image */}
         <div>
           <label className="block text-sm font-medium mb-2">Token Image</label>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {/* Image preview */}
             <div
-              className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center border-2 border-border"
+              className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center border-2 border-border/50 flex-shrink-0"
               style={{ backgroundColor: color }}
             >
               {imagePreview ? (
                 <img src={imagePreview} alt="Token preview" className="w-full h-full object-cover" />
               ) : (
-                <span className="text-2xl font-bold text-white">
+                <span className="text-xl font-bold text-white/90">
                   {name.charAt(0).toUpperCase() || '?'}
                 </span>
               )}
@@ -231,65 +240,58 @@ export function TokenEditorModal() {
             {/* Upload/Change button */}
             <button
               onClick={() => setShowImagePicker(true)}
-              className="min-h-[44px] px-4 py-2 text-sm bg-muted hover:bg-secondary border border-border rounded-lg transition-colors flex items-center gap-2"
+              className="h-9 px-3 text-sm bg-muted/70 hover:bg-muted border border-border/60 rounded-lg transition-all active:scale-[0.98] flex items-center gap-2"
             >
-              <Icon name="image" size={16} />
-              {imagePreview ? 'Change Image' : 'Add Image'}
+              <Icon name="image" size={15} />
+              {imagePreview ? 'Change' : 'Add Image'}
             </button>
 
             {/* Remove button */}
             {imagePreview && (
               <button
                 onClick={handleRemoveImage}
-                className="min-h-[44px] px-4 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                className="h-9 px-3 text-sm text-destructive/80 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
               >
                 Remove
               </button>
             )}
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
+          <p className="mt-2 text-[11px] text-muted-foreground">
             Images are automatically cropped to a circle with a gold border
           </p>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-3">
-          <NumberInput
-            id={maxHpId}
-            label="Max HP"
-            value={maxHp}
-            onChange={setMaxHp}
-            min={0}
-            max={9999}
-          />
-          <NumberInput
-            id={currentHpId}
-            label="Current HP"
-            value={currentHp}
-            onChange={setCurrentHp}
-            min={0}
-            max={maxHp}
-          />
-          <div>
-            <label htmlFor={acId} className="block text-sm font-medium mb-1">
-              AC
-              <span className="sr-only"> (Armor Class)</span>
-            </label>
+        {/* Stats - 2x2 grid on mobile-friendly widths */}
+        <div>
+          <label className="block text-sm font-medium mb-2">Combat Stats</label>
+          <div className="grid grid-cols-4 gap-2">
+            <NumberInput
+              id={maxHpId}
+              label="Max HP"
+              value={maxHp}
+              onChange={setMaxHp}
+              min={0}
+              max={9999}
+            />
+            <NumberInput
+              id={currentHpId}
+              label="Current"
+              value={currentHp}
+              onChange={setCurrentHp}
+              min={0}
+              max={maxHp}
+            />
             <NumberInput
               id={acId}
+              label="AC"
               value={armorClass}
               onChange={setArmorClass}
               min={0}
               max={99}
             />
-          </div>
-          <div>
-            <label htmlFor={initModId} className="block text-sm font-medium mb-1">
-              Init
-              <span className="sr-only">iative Modifier</span>
-            </label>
             <NumberInput
               id={initModId}
+              label="Init Mod"
               value={initiativeModifier}
               onChange={setInitiativeModifier}
               min={-10}
@@ -300,53 +302,56 @@ export function TokenEditorModal() {
 
         {/* Notes */}
         <div>
-          <label htmlFor={notesId} className="block text-sm font-medium mb-1">
-            Notes
-            <span className="text-muted-foreground ml-1 font-normal">(DM only)</span>
-          </label>
+          <div className="flex items-baseline justify-between mb-1.5">
+            <label htmlFor={notesId} className="text-sm font-medium">
+              Notes
+            </label>
+            <span className="text-[11px] text-muted-foreground">DM only</span>
+          </div>
           <textarea
             id={notesId}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            rows={3}
+            rows={2}
             maxLength={1000}
-            className="w-full px-3 py-2 bg-background border border-border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-ring transition-colors text-sm"
             placeholder="Private notes about this token..."
           />
-          <p className="mt-1 text-xs text-muted-foreground">
-            {notes.length}/1000 characters
+          <p className="mt-1 text-[11px] text-muted-foreground tabular-nums">
+            {notes.length}/1000
           </p>
         </div>
       </div>
 
-      <div className="flex gap-3 justify-between mt-6">
+      {/* Footer actions */}
+      <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/50">
         {/* Save to Library button */}
         <Tooltip content="Save this token as a reusable template in your library">
           <button
             onClick={handleSaveToLibrary}
             disabled={!name.trim() || savedToLibrary}
-            className={`min-h-[44px] px-4 py-2 text-sm rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-secondary flex items-center gap-2 ${
+            className={`h-10 px-3.5 text-sm rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center gap-2 ${
               savedToLibrary
-                ? 'bg-success text-white'
-                : 'bg-muted hover:bg-secondary border border-border'
+                ? 'bg-success/90 text-white'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/70 disabled:opacity-50'
             }`}
           >
-            <Icon name={savedToLibrary ? 'check' : 'book'} size={16} />
-            {savedToLibrary ? 'Saved!' : 'Save to Library'}
+            <Icon name={savedToLibrary ? 'check' : 'book'} size={15} />
+            <span className="font-medium">{savedToLibrary ? 'Saved!' : 'Save to Library'}</span>
           </button>
         </Tooltip>
 
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <button
             onClick={handleClose}
-            className="min-h-[44px] px-4 py-2 text-sm rounded-lg hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-secondary"
+            className="h-10 px-4 text-sm rounded-lg hover:bg-muted/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={!name.trim()}
-            className="min-h-[44px] px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-secondary"
+            className="h-10 px-5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Save Changes
           </button>

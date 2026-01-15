@@ -96,17 +96,19 @@ export function WelcomeScreen() {
   return (
     <main className="flex flex-col h-full">
       {/* Header */}
-      <header className="flex-shrink-0 p-6 border-b border-border">
+      <header className="flex-shrink-0 py-6 px-6 border-b border-border">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">DungeonMap</h1>
+            <h1 className="text-2xl font-semibold text-foreground">
+              Grimoire
+            </h1>
             <p className="text-sm text-muted-foreground">
-              D&D 5E Battle Map Manager
+              Battle Map Manager
             </p>
           </div>
           <button
             onClick={() => openModal('new-encounter')}
-            className="min-h-[44px] px-6 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background flex items-center gap-2"
+            className="min-h-[44px] px-5 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background flex items-center gap-2"
           >
             <Icon name="plus" size={18} />
             New Encounter
@@ -209,7 +211,7 @@ export function WelcomeScreen() {
                     const isLoading = loadingId === enc.id
                     return (
                       <li key={enc.id}>
-                        <div className="w-full p-4 bg-secondary rounded-lg flex items-center gap-4 group">
+                        <div className="w-full p-4 bg-secondary rounded-lg flex items-center gap-4 group hover:bg-secondary/80 transition-colors">
                           <button
                             onClick={() => handleLoad(enc.id)}
                             disabled={isLoading}
@@ -254,14 +256,14 @@ export function WelcomeScreen() {
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center py-12 px-6 bg-secondary rounded-lg max-w-md">
-                <Icon name="box" size={48} className="mx-auto mb-4 text-muted-foreground" />
+                <Icon name="map" size={48} className="mx-auto mb-4 text-muted-foreground" />
                 <p className="text-lg font-medium mb-2">No encounters yet</p>
                 <p className="text-sm text-muted-foreground mb-6">
-                  Create your first encounter to get started with battle mapping!
+                  Create your first encounter to get started with battle mapping.
                 </p>
                 <button
                   onClick={() => openModal('new-encounter')}
-                  className="min-h-[44px] px-6 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center gap-2 mx-auto"
+                  className="min-h-[44px] px-6 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center gap-2 mx-auto"
                 >
                   <Icon name="plus" size={18} />
                   Create Encounter
