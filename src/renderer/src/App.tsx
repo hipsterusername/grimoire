@@ -13,6 +13,7 @@ import { GridGeneratorModal } from './components/modals/GridGeneratorModal'
 import { TemplateEditorModal } from './components/modals/TemplateEditorModal'
 import { SettingsModal } from './components/modals/SettingsModal'
 import { AssetManagementModal } from './components/modals/AssetManagementModal'
+import { HelpModal } from './components/modals/HelpModal'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { LoadingScreen } from './components/ui/LoadingSpinner'
 import { PresentationView } from './components/presentation/PresentationView'
@@ -115,6 +116,7 @@ function AppContent() {
       {/* Global modals */}
       {activeModal === 'settings' && <SettingsModal />}
       {activeModal === 'asset-management' && <AssetManagementModal />}
+      {activeModal === 'help' && <HelpModal isOpen={true} onClose={() => useUIStore.getState().closeModal()} />}
     </div>
   )
 }

@@ -299,6 +299,129 @@ describe('encounter-store', () => {
     })
   })
 
+  describe('condition management', () => {
+    beforeEach(() => {
+      setupMockCampaign()
+      const store = useEncounterStore.getState()
+      store.createEncounter('Condition Test')
+      store.addToken(createTestToken({ name: 'Fighter' }))
+    })
+
+    it('adds a condition to a token', () => {
+      const store = useEncounterStore.getState()
+      const tokenId = useEncounterStore.getState().encounter?.tokens[0].id!
+
+      store.addCondition(tokenId, { name: 'Poisoned', color: '#22c55e' })
+
+      const { encounter } = useEncounterStore.getState()
+      expect(encounter?.tokens[0].conditions).toHaveLength(1)
+      expect(encounter?.tokens[0].conditions[0].name).toBe('Poisoned')
+      expect(encounter?.tokens[0].conditions[0].color).toBe('#22c55e')
+      expect(encounter?.tokens[0].conditions[0].id).toBeDefined()
+    })
+
+    it('adds a condition with duration', () => {
+      const store = useEncounterStore.getState()
+      const tokenId = useEncounterStore.getState().encounter?.tokens[0].id!
+
+      store.addCondition(tokenId, { name: 'Blessed', color: '#fbbf24', duration: 3 })
+
+      const { encounter } = useEncounterStore.getState()
+      expect(encounter?.tokens[0].conditions[0].duration).toBe(3)
+    })
+
+    it('removes a condition from a token', () => {
+      const store = useEncounterStore.getState()
+      const tokenId = useEncounterStore.getState().encounter?.tokens[0].id!
+
+      store.addCondition(tokenId, { name: 'Poisoned', color: '#22c55e' })
+      store.addCondition(tokenId, { name: 'Frightened', color: '#a855f7' })
+
+      const conditionId = useEncounterStore.getState().encounter?.tokens[0].conditions[0].id!
+      store.removeCondition(tokenId, conditionId)
+
+      const { encounter } = useEncounterStore.getState()
+      expect(encounter?.tokens[0].conditions).toHaveLength(1)
+      expect(encounter?.tokens[0].conditions[0].name).toBe('Frightened')
+    })
+
+    it('decrements condition duration on nextTurn', () => {
+      const store = useEncounterStore.getState()
+
+      // Add a second token for initiative order
+      store.addToken(createTestToken({ name: 'Goblin' }))
+
+      // Set up initiative
+      const tokens = useEncounterStore.getState().encounter?.tokens!
+      store.setInitiative(tokens[0].id, 15)
+      store.setInitiative(tokens[1].id, 10)
+      store.sortInitiative()
+      store.startCombat()
+
+      // Add a condition with duration 2 to the first token (Fighter)
+      store.addCondition(tokens[0].id, { name: 'Blessed', color: '#fbbf24', duration: 2 })
+
+      // Verify initial duration
+      expect(useEncounterStore.getState().encounter?.tokens[0].conditions[0].duration).toBe(2)
+
+      // Advance turn (Fighter's turn ends)
+      store.nextTurn()
+
+      // Duration should be decremented
+      expect(useEncounterStore.getState().encounter?.tokens[0].conditions[0].duration).toBe(1)
+    })
+
+    it('removes condition when duration reaches 0', () => {
+      const store = useEncounterStore.getState()
+
+      // Add a second token for initiative order
+      store.addToken(createTestToken({ name: 'Goblin' }))
+
+      // Set up initiative
+      const tokens = useEncounterStore.getState().encounter?.tokens!
+      store.setInitiative(tokens[0].id, 15)
+      store.setInitiative(tokens[1].id, 10)
+      store.sortInitiative()
+      store.startCombat()
+
+      // Add a condition with duration 1 to the first token
+      store.addCondition(tokens[0].id, { name: 'Blessed', color: '#fbbf24', duration: 1 })
+
+      expect(useEncounterStore.getState().encounter?.tokens[0].conditions).toHaveLength(1)
+
+      // Advance turn (Fighter's turn ends, condition expires)
+      store.nextTurn()
+
+      // Condition should be removed
+      expect(useEncounterStore.getState().encounter?.tokens[0].conditions).toHaveLength(0)
+    })
+
+    it('does not decrement permanent conditions (no duration)', () => {
+      const store = useEncounterStore.getState()
+
+      // Add a second token for initiative order
+      store.addToken(createTestToken({ name: 'Goblin' }))
+
+      // Set up initiative
+      const tokens = useEncounterStore.getState().encounter?.tokens!
+      store.setInitiative(tokens[0].id, 15)
+      store.setInitiative(tokens[1].id, 10)
+      store.sortInitiative()
+      store.startCombat()
+
+      // Add a permanent condition (no duration)
+      store.addCondition(tokens[0].id, { name: 'Poisoned', color: '#22c55e' })
+
+      // Advance turn
+      store.nextTurn()
+
+      // Condition should still exist and have no duration
+      const condition = useEncounterStore.getState().encounter?.tokens[0].conditions[0]
+      expect(condition?.name).toBe('Poisoned')
+      expect(condition?.duration).toBeUndefined()
+    })
+  })
+
   describe('fog of war', () => {
     beforeEach(() => {
       setupMockCampaign()

@@ -1,12 +1,22 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
+import { useEffect, useRef, useState, useMemo, useCallback, createContext, useContext } from 'react'
 import { Stage, Layer, Rect, Group, Image as KonvaImage, Line } from 'react-konva'
 import useImage from 'use-image'
 import type Konva from 'konva'
-import { usePresentationStore, useLibraryStore } from '../../stores'
+import { usePresentationStore } from '../../stores'
 import type { PresentationState, PresentationBounds } from '../../stores/presentation-store'
-import type { Encounter, Token, FogOfWar } from '../../types'
+import type { Encounter, Token, FogOfWar, Asset } from '../../types'
 import { SIZE_TO_GRID_UNITS, CreatureSize, TokenType } from '../../types'
+import { ConditionIndicators } from '../canvas/tokens/ConditionIndicators'
 import { Icon } from '../ui/Icon'
+
+// Context to provide synced library assets to child components
+// This replaces the useLibraryStore hook which doesn't work in the presentation window
+// because it depends on campaign context that isn't synced
+const SyncedAssetsContext = createContext<Asset[]>([])
+
+function useSyncedAssets() {
+  return useContext(SyncedAssetsContext)
+}
 
 // Explicit state machine for view initialization
 type ViewStatus =
@@ -32,19 +42,19 @@ interface TokenDisplayProps {
 }
 
 function TokenDisplay({ token, gridSize, offsetX, offsetY }: TokenDisplayProps) {
-  // Early return before hooks for invisible tokens
-  const isVisible = token.visible
+  // Early return before hooks for invisible or hidden tokens
+  const isVisible = token.visible && !token.hidden
 
-  const library = useLibraryStore((s) => s.library)
+  const syncedAssets = useSyncedAssets()
 
   const imageUrl = useMemo(() => {
     if (!isVisible) return null
     if (token.assetId) {
-      const asset = library.assets.find((a) => a.id === token.assetId)
+      const asset = syncedAssets.find((a) => a.id === token.assetId)
       return asset?.processedDataUrl
     }
     return token.imageUrl
-  }, [isVisible, token.assetId, token.imageUrl, library.assets])
+  }, [isVisible, token.assetId, token.imageUrl, syncedAssets])
 
   const [image] = useImage(imageUrl ?? '', 'anonymous')
 
@@ -99,6 +109,13 @@ function TokenDisplay({ token, gridSize, offsetX, offsetY }: TokenDisplayProps) 
           fill={token.color}
         />
       )}
+
+      {/* Condition indicators with icons - visible to players */}
+      <ConditionIndicators
+        conditions={token.conditions}
+        tokenSize={tokenSize}
+        offset={offset}
+      />
     </Group>
   )
 }
@@ -123,16 +140,16 @@ function getHpBarColor(hpPercent: number): string {
 }
 
 function InitiativePanel({ tokens, currentTurnTokenId }: InitiativePanelProps) {
-  const library = useLibraryStore((s) => s.library)
+  const syncedAssets = useSyncedAssets()
 
-  // Sort by initiative (descending)
+  // Sort by initiative (descending), filtering out invisible and hidden tokens
   const sortedTokens = [...tokens]
-    .filter((t) => t.visible)
+    .filter((t) => t.visible && !t.hidden)
     .sort((a, b) => (b.stats.initiative ?? 0) - (a.stats.initiative ?? 0))
 
   const getAssetPreview = (assetId?: string) => {
     if (!assetId) return null
-    return library.assets.find((a) => a.id === assetId)?.processedDataUrl
+    return syncedAssets.find((a) => a.id === assetId)?.processedDataUrl
   }
 
   return (
@@ -152,61 +169,82 @@ function InitiativePanel({ tokens, currentTurnTokenId }: InitiativePanelProps) {
           return (
             <div
               key={token.id}
-              className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
+              className={`p-2 rounded-lg transition-colors ${
                 isCurrentTurn ? 'bg-primary/20 ring-1 ring-primary' : 'bg-muted/50'
               }`}
             >
-              {/* Token avatar */}
-              <div
-                className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border-2"
-                style={{
-                  backgroundColor: token.color,
-                  borderColor: token.color
-                }}
-              >
-                {preview ? (
-                  <img src={preview} alt="" className="w-full h-full object-cover" />
+              <div className="flex items-center gap-2">
+                {/* Token avatar */}
+                <div
+                  className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border-2"
+                  style={{
+                    backgroundColor: token.color,
+                    borderColor: token.color
+                  }}
+                >
+                  {preview ? (
+                    <img src={preview} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="w-full h-full flex items-center justify-center text-white font-bold text-sm">
+                      {token.name.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{token.name}</p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>Init: {token.stats.initiative ?? '-'}</span>
+                    {isPlayer && <span>AC: {token.stats.armorClass}</span>}
+                  </div>
+                </div>
+
+                {/* HP display - different for players vs non-players */}
+                {isPlayer ? (
+                  // Players: Show HP bar with numbers
+                  <div className="w-16">
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full transition-all"
+                        style={{
+                          width: `${Math.max(0, Math.min(100, hpPercent * 100))}%`,
+                          backgroundColor: getHpBarColor(hpPercent)
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs text-center mt-0.5 text-muted-foreground">
+                      {token.stats.currentHp}/{token.stats.maxHp}
+                    </p>
+                  </div>
                 ) : (
-                  <span className="w-full h-full flex items-center justify-center text-white font-bold text-sm">
-                    {token.name.charAt(0).toUpperCase()}
+                  // Non-players: Show health status text
+                  <span
+                    className="text-xs font-medium px-2 py-1 rounded"
+                    style={{ backgroundColor: `${healthStatus.hex}20`, color: healthStatus.hex }}
+                  >
+                    {healthStatus.text}
                   </span>
                 )}
               </div>
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{token.name}</p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>Init: {token.stats.initiative ?? '-'}</span>
-                  {isPlayer && <span>AC: {token.stats.armorClass}</span>}
+              {/* Conditions row */}
+              {token.conditions.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5 ml-10">
+                  {token.conditions.map((condition) => (
+                    <span
+                      key={condition.id}
+                      className="px-1.5 py-0.5 text-[10px] rounded-full text-white font-medium"
+                      style={{ backgroundColor: condition.color ?? '#ef4444' }}
+                      title={condition.duration !== undefined ? `${condition.name} (${condition.duration} rounds)` : condition.name}
+                    >
+                      {condition.name}
+                      {condition.duration !== undefined && (
+                        <span className="ml-0.5 opacity-75">({condition.duration})</span>
+                      )}
+                    </span>
+                  ))}
                 </div>
-              </div>
-
-              {/* HP display - different for players vs non-players */}
-              {isPlayer ? (
-                // Players: Show HP bar with numbers
-                <div className="w-16">
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full transition-all"
-                      style={{
-                        width: `${Math.max(0, Math.min(100, hpPercent * 100))}%`,
-                        backgroundColor: getHpBarColor(hpPercent)
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs text-center mt-0.5 text-muted-foreground">
-                    {token.stats.currentHp}/{token.stats.maxHp}
-                  </p>
-                </div>
-              ) : (
-                // Non-players: Show health status text
-                <span
-                  className="text-xs font-medium px-2 py-1 rounded"
-                  style={{ backgroundColor: `${healthStatus.hex}20`, color: healthStatus.hex }}
-                >
-                  {healthStatus.text}
-                </span>
               )}
             </div>
           )
@@ -221,14 +259,14 @@ interface TokenDetailsPanelProps {
 }
 
 function TokenDetailsPanel({ token }: TokenDetailsPanelProps) {
-  const library = useLibraryStore((s) => s.library)
+  const syncedAssets = useSyncedAssets()
 
   if (!token) {
     return null
   }
 
   const preview = token.assetId
-    ? library.assets.find((a) => a.id === token.assetId)?.processedDataUrl
+    ? syncedAssets.find((a) => a.id === token.assetId)?.processedDataUrl
     : null
 
   const hpPercent = token.stats.maxHp > 0 ? token.stats.currentHp / token.stats.maxHp : 1
@@ -493,11 +531,12 @@ export function PresentationView() {
   const containerRef = useRef<HTMLDivElement>(null)
 
   const { setReceivedState } = usePresentationStore()
-  const loadLibrary = useLibraryStore((s) => s.loadLibrary)
 
   // State machine for initialization
   const [viewStatus, setViewStatus] = useState<ViewStatus>({ state: 'initializing' })
   const [bounds, setBounds] = useState<PresentationBounds>({ x: 0, y: 0, width: 800, height: 600 })
+  // Library assets synced from main window - used for token images
+  const [syncedAssets, setSyncedAssets] = useState<Asset[]>([])
 
   // Derive showInitiative from ready state
   const showInitiative = viewStatus.state === 'ready' ? (viewStatus.data.showInitiative ?? true) : false
@@ -507,11 +546,6 @@ export function PresentationView() {
     width: window.innerWidth - (showInitiative ? SIDEBAR_WIDTH : 0),
     height: window.innerHeight
   }))
-
-  // Load library on mount for token images
-  useEffect(() => {
-    loadLibrary()
-  }, [loadLibrary])
 
   // Track window resize and sidebar visibility
   useEffect(() => {
@@ -539,6 +573,11 @@ export function PresentationView() {
     // Update bounds if valid
     if (state.viewBounds && state.viewBounds.width > 0 && state.viewBounds.height > 0) {
       setBounds(state.viewBounds)
+    }
+
+    // Update synced library assets for token images
+    if (state.libraryAssets) {
+      setSyncedAssets(state.libraryAssets)
     }
   }, [setReceivedState])
 
@@ -701,112 +740,114 @@ export function PresentationView() {
   const mapHeight = encounter.map?.imageHeight ?? safeBounds.height
 
   return (
-    <div className="w-screen h-screen bg-zinc-950 flex">
-      {/* Map canvas - uses absolute positioning with explicit window dimensions */}
-      <div ref={containerRef} className="flex-1 relative">
-        <Stage
-          ref={stageRef}
-          width={windowSize.width}
-          height={windowSize.height}
-          style={{ position: 'absolute', top: 0, left: 0 }}
-        >
-            {/* Content layer with transforms and CLIPPING to bounds */}
-            <Layer
-              x={offsetX}
-              y={offsetY}
-              scaleX={scale}
-              scaleY={scale}
-              clipX={0}
-              clipY={0}
-              clipWidth={safeBounds.width}
-              clipHeight={safeBounds.height}
-            >
-              {/* Background */}
-              <Rect
-                x={0}
-                y={0}
-                width={safeBounds.width}
-                height={safeBounds.height}
-                fill="#2a2a3e"
-              />
-
-              {/* Map image - positioned so bounds area is at origin */}
-              {mapImage && (
-                <KonvaImage
-                  image={mapImage}
-                  x={-safeBounds.x}
-                  y={-safeBounds.y}
-                  width={mapWidth}
-                  height={mapHeight}
+    <SyncedAssetsContext.Provider value={syncedAssets}>
+      <div className="w-screen h-screen bg-zinc-950 flex">
+        {/* Map canvas - uses absolute positioning with explicit window dimensions */}
+        <div ref={containerRef} className="flex-1 relative">
+          <Stage
+            ref={stageRef}
+            width={windowSize.width}
+            height={windowSize.height}
+            style={{ position: 'absolute', top: 0, left: 0 }}
+          >
+              {/* Content layer with transforms and CLIPPING to bounds */}
+              <Layer
+                x={offsetX}
+                y={offsetY}
+                scaleX={scale}
+                scaleY={scale}
+                clipX={0}
+                clipY={0}
+                clipWidth={safeBounds.width}
+                clipHeight={safeBounds.height}
+              >
+                {/* Background */}
+                <Rect
+                  x={0}
+                  y={0}
+                  width={safeBounds.width}
+                  height={safeBounds.height}
+                  fill="#2a2a3e"
                 />
-              )}
 
-              {/* Grid overlay */}
-              {encounter.map?.gridSettings?.showGrid && (() => {
-                const settings = encounter.map.gridSettings
-                const lines: React.ReactElement[] = []
+                {/* Map image - positioned so bounds area is at origin */}
+                {mapImage && (
+                  <KonvaImage
+                    image={mapImage}
+                    x={-safeBounds.x}
+                    y={-safeBounds.y}
+                    width={mapWidth}
+                    height={mapHeight}
+                  />
+                )}
 
-                // Vertical lines
-                for (let x = 0; x <= mapWidth; x += settings.gridSize) {
-                  lines.push(
-                    <Line
-                      key={`v-${x}`}
-                      points={[x - safeBounds.x, -safeBounds.y, x - safeBounds.x, mapHeight - safeBounds.y]}
-                      stroke={settings.gridColor}
-                      strokeWidth={1}
-                      opacity={settings.gridOpacity}
-                    />
-                  )
-                }
+                {/* Grid overlay */}
+                {encounter.map?.gridSettings?.showGrid && (() => {
+                  const settings = encounter.map.gridSettings
+                  const lines: React.ReactElement[] = []
 
-                // Horizontal lines
-                for (let y = 0; y <= mapHeight; y += settings.gridSize) {
-                  lines.push(
-                    <Line
-                      key={`h-${y}`}
-                      points={[-safeBounds.x, y - safeBounds.y, mapWidth - safeBounds.x, y - safeBounds.y]}
-                      stroke={settings.gridColor}
-                      strokeWidth={1}
-                      opacity={settings.gridOpacity}
-                    />
-                  )
-                }
+                  // Vertical lines
+                  for (let x = 0; x <= mapWidth; x += settings.gridSize) {
+                    lines.push(
+                      <Line
+                        key={`v-${x}`}
+                        points={[x - safeBounds.x, -safeBounds.y, x - safeBounds.x, mapHeight - safeBounds.y]}
+                        stroke={settings.gridColor}
+                        strokeWidth={1}
+                        opacity={settings.gridOpacity}
+                      />
+                    )
+                  }
 
-                return lines
-              })()}
+                  // Horizontal lines
+                  for (let y = 0; y <= mapHeight; y += settings.gridSize) {
+                    lines.push(
+                      <Line
+                        key={`h-${y}`}
+                        points={[-safeBounds.x, y - safeBounds.y, mapWidth - safeBounds.x, y - safeBounds.y]}
+                        stroke={settings.gridColor}
+                        strokeWidth={1}
+                        opacity={settings.gridOpacity}
+                      />
+                    )
+                  }
 
-              {/* Tokens */}
-              {encounter.tokens.map((token) => (
-                <TokenDisplay
-                  key={token.id}
-                  token={token}
-                  gridSize={gridSize}
-                  offsetX={safeBounds.x}
-                  offsetY={safeBounds.y}
-                />
-              ))}
+                  return lines
+                })()}
 
-              {/* Fog of War - rendered on top of everything */}
-              {viewStatus.data.showFogOfWar && encounter.fogOfWar && (
-                <PresentationFogLayer
-                  fogOfWar={encounter.fogOfWar}
-                  mapWidth={mapWidth}
-                  mapHeight={mapHeight}
-                  boundsX={safeBounds.x}
-                  boundsY={safeBounds.y}
-                />
-              )}
-            </Layer>
-          </Stage>
-      </div>
+                {/* Tokens */}
+                {encounter.tokens.map((token) => (
+                  <TokenDisplay
+                    key={token.id}
+                    token={token}
+                    gridSize={gridSize}
+                    offsetX={safeBounds.x}
+                    offsetY={safeBounds.y}
+                  />
+                ))}
 
-      {/* Sidebar */}
-      {showInitiative && (
-        <div className="w-72 bg-secondary/50 p-3 flex flex-col gap-3 overflow-y-auto">
-          <InitiativePanel tokens={encounter.tokens} currentTurnTokenId={currentTurnTokenId} />
-          <TokenDetailsPanel token={currentTurnToken} />
+                {/* Fog of War - rendered on top of everything */}
+                {viewStatus.data.showFogOfWar && encounter.fogOfWar && (
+                  <PresentationFogLayer
+                    fogOfWar={encounter.fogOfWar}
+                    mapWidth={mapWidth}
+                    mapHeight={mapHeight}
+                    boundsX={safeBounds.x}
+                    boundsY={safeBounds.y}
+                  />
+                )}
+              </Layer>
+            </Stage>
         </div>
-      )}
-    </div>
+
+        {/* Sidebar */}
+        {showInitiative && (
+          <div className="w-72 bg-secondary/50 p-3 flex flex-col gap-3 overflow-y-auto">
+            <InitiativePanel tokens={encounter.tokens} currentTurnTokenId={currentTurnTokenId} />
+            <TokenDetailsPanel token={currentTurnToken} />
+          </div>
+        )}
+      </div>
+    </SyncedAssetsContext.Provider>
   )
 }

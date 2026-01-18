@@ -1,4 +1,4 @@
-import { Group, Rect, Text } from 'react-konva'
+import { Group, Rect } from 'react-konva'
 
 interface TokenHealthBarProps {
   currentHp: number
@@ -67,16 +67,6 @@ export function TokenHealthBar({
         />
       )}
 
-      {/* HP text */}
-      <Text
-        x={0}
-        y={height + 1}
-        width={width}
-        text={`${currentHp}${tempHp > 0 ? `+${tempHp}` : ''}/${maxHp}`}
-        fontSize={9}
-        fill="#9ca3af"
-        align="center"
-      />
     </Group>
   )
 }

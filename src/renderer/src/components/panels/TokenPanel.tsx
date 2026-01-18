@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useEncounterStore, useCanvasStore, useUIStore, usePresentationStore } from '../../stores'
-import { CreatureSize, TokenType } from '../../types'
+import { CreatureSize, TokenType, SIZE_TO_GRID_UNITS, Token } from '../../types'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { Modal } from '../ui/Modal'
 import { Icon } from '../ui/Icon'
@@ -163,10 +163,252 @@ function HpAdjustModal({
   )
 }
 
+// Token list item component for reuse in both in-bounds and out-of-bounds lists
+interface TokenListItemProps {
+  token: Token
+  isSelected: boolean
+  onSelect: (id: string) => void
+  onQuickHpChange: (id: string, delta: number) => void
+  onOpenHpModal: (token: { id: string; name: string; stats: { currentHp: number; maxHp: number } }) => void
+  onToggleHidden: (id: string) => void
+  onLocate: (id: string) => void
+  onEdit: (id: string) => void
+  onDelete: (id: string, name: string) => void
+}
+
+function TokenListItem({
+  token,
+  isSelected,
+  onSelect,
+  onQuickHpChange,
+  onOpenHpModal,
+  onToggleHidden,
+  onLocate,
+  onEdit,
+  onDelete
+}: TokenListItemProps) {
+  const itemRef = useRef<HTMLLIElement>(null)
+
+  // Scroll into view when selected
+  useEffect(() => {
+    if (isSelected && itemRef.current) {
+      itemRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [isSelected])
+
+  const hpPercent = token.stats.maxHp > 0
+    ? token.stats.currentHp / token.stats.maxHp
+    : 1
+  const hpStatus =
+    hpPercent > 0.5 ? 'healthy' : hpPercent > 0.25 ? 'injured' : 'critical'
+
+  return (
+    <li ref={itemRef} role="listitem">
+      <div
+        onClick={() => onSelect(token.id)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onSelect(token.id)
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-pressed={isSelected}
+        aria-label={`${token.name}, ${token.type}, ${token.stats.currentHp} of ${token.stats.maxHp} HP, ${token.hidden ? 'hidden from players, ' : ''}${isSelected ? 'selected' : 'not selected'}`}
+        className={`p-2.5 rounded-lg cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+          isSelected
+            ? 'bg-primary/15 ring-1 ring-primary/60'
+            : 'bg-muted/60 hover:bg-muted'
+        }`}
+      >
+        {/* Title row with type icon and AC on right */}
+        <div className="flex items-center gap-2 mb-2">
+          <div
+            className="w-3 h-3 rounded-full flex-shrink-0 ring-1 ring-white/10"
+            style={{ backgroundColor: token.color }}
+            aria-hidden="true"
+          />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className={`text-sm font-medium truncate leading-tight ${token.hidden ? 'text-muted-foreground/70' : ''}`} title={token.name}>
+                {token.name}
+              </span>
+              {/* Condition indicators */}
+              {token.conditions.length > 0 && (
+                <div className="flex items-center gap-0.5 flex-shrink-0">
+                  {token.conditions.slice(0, 3).map((condition) => (
+                    <Tooltip key={condition.id} content={`${condition.name}${condition.duration !== undefined ? ` (${condition.duration} turns)` : ''}`}>
+                      <div
+                        className="w-2.5 h-2.5 rounded-full ring-1 ring-black/20"
+                        style={{ backgroundColor: condition.color ?? '#ef4444' }}
+                      />
+                    </Tooltip>
+                  ))}
+                  {token.conditions.length > 3 && (
+                    <span className="text-[10px] text-muted-foreground">+{token.conditions.length - 3}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 text-muted-foreground flex-shrink-0">
+            <Tooltip content={token.type === TokenType.PlayerCharacter ? 'Player Character' : token.type === TokenType.NonPlayerCharacter ? 'NPC' : token.type}>
+              <Icon
+                name={
+                  token.type === TokenType.PlayerCharacter ? 'user' :
+                  token.type === TokenType.NonPlayerCharacter ? 'users' :
+                  token.type === TokenType.Monster ? 'skull' : 'box'
+                }
+                size={14}
+                aria-label={token.type}
+              />
+            </Tooltip>
+            <span className="text-xs tabular-nums">AC {token.stats.armorClass}</span>
+          </div>
+        </div>
+
+        {/* Controls row: HP on left, action buttons on right */}
+        <div className="flex items-center justify-between gap-2">
+          {/* HP controls */}
+          {token.stats.maxHp > 0 ? (
+            <div className="flex items-center" role="group" aria-label={`HP controls for ${token.name}`}>
+              <Tooltip content="Reduce HP by 1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onQuickHpChange(token.id, -1)
+                  }}
+                  className="w-7 h-7 text-sm font-bold bg-secondary/80 rounded-l-md hover:bg-destructive hover:text-destructive-foreground active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:z-10"
+                  aria-label={`Decrease HP for ${token.name}`}
+                >
+                  −
+                </button>
+              </Tooltip>
+              <Tooltip content="Click to enter damage/healing amount">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenHpModal(token)
+                  }}
+                  className={`min-w-[52px] h-7 px-2 text-xs font-medium bg-secondary/80 hover:bg-secondary text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:z-10 tabular-nums ${
+                    hpStatus === 'critical' ? 'text-destructive' : ''
+                  }`}
+                  aria-label={`${token.name} HP: ${token.stats.currentHp} of ${token.stats.maxHp}. Click to adjust.`}
+                >
+                  {token.stats.currentHp}/{token.stats.maxHp}
+                </button>
+              </Tooltip>
+              <Tooltip content="Increase HP by 1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onQuickHpChange(token.id, 1)
+                  }}
+                  className="w-7 h-7 text-sm font-bold bg-secondary/80 rounded-r-md hover:bg-success hover:text-white active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:z-10"
+                  aria-label={`Increase HP for ${token.name}`}
+                >
+                  +
+                </button>
+              </Tooltip>
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground/60">No HP</span>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex gap-1" role="group" aria-label={`Actions for ${token.name}`}>
+            <Tooltip content={token.hidden ? 'Show to players' : 'Hide from players'}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToggleHidden(token.id)
+                }}
+                className={`w-7 h-7 flex items-center justify-center rounded-md active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  token.hidden
+                    ? 'text-warning hover:text-foreground hover:bg-secondary/80'
+                    : 'text-muted-foreground hover:text-warning hover:bg-warning/10'
+                }`}
+                aria-label={token.hidden ? `Show ${token.name} to players` : `Hide ${token.name} from players`}
+                aria-pressed={token.hidden}
+              >
+                <Icon name={token.hidden ? 'eye-off' : 'eye'} size={14} />
+              </button>
+            </Tooltip>
+            <Tooltip content="Locate on map">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onLocate(token.id)
+                }}
+                className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/80 active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`Locate ${token.name} on map`}
+              >
+                <Icon name="crosshair" size={14} />
+              </button>
+            </Tooltip>
+            <Tooltip content="Edit token">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onEdit(token.id)
+                }}
+                className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/80 active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`Edit ${token.name}`}
+              >
+                <Icon name="edit" size={14} />
+              </button>
+            </Tooltip>
+            <Tooltip content="Delete token">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete(token.id, token.name)
+                }}
+                className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-destructive hover:text-destructive-foreground active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`Delete ${token.name}`}
+              >
+                <Icon name="trash" size={14} />
+              </button>
+            </Tooltip>
+          </div>
+        </div>
+
+        {/* HP bar */}
+        {token.stats.maxHp > 0 && (
+          <div
+            className="mt-2 h-1 bg-secondary/40 rounded-full overflow-hidden"
+            role="progressbar"
+            aria-valuenow={token.stats.currentHp}
+            aria-valuemin={0}
+            aria-valuemax={token.stats.maxHp}
+            aria-label={`${token.name} health: ${token.stats.currentHp} of ${token.stats.maxHp}`}
+          >
+            <div
+              className={`h-full rounded-full transition-all duration-200 ${
+                hpStatus === 'healthy'
+                  ? 'bg-success'
+                  : hpStatus === 'injured'
+                    ? 'bg-warning'
+                    : 'bg-destructive'
+              }`}
+              style={{
+                width: `${hpPercent * 100}%`,
+                transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)' /* ease-out-expo */
+              }}
+            />
+          </div>
+        )}
+      </div>
+    </li>
+  )
+}
+
 export function TokenPanel() {
   const encounter = useEncounterStore((s) => s.encounter)
   const addToken = useEncounterStore((s) => s.addToken)
   const removeToken = useEncounterStore((s) => s.removeToken)
+  const updateToken = useEncounterStore((s) => s.updateToken)
   const updateTokenHp = useEncounterStore((s) => s.updateTokenHp)
 
   const selection = useCanvasStore((s) => s.selection)
@@ -281,6 +523,46 @@ export function TokenPanel() {
     }
   }
 
+  // Check if a token is within the presentation bounds
+  const isTokenInBounds = (token: Token): boolean => {
+    if (!encounter?.map) return false
+    const gridSize = encounter.map.gridSettings.gridSize
+    const tokenUnits = SIZE_TO_GRID_UNITS[token.size]
+    const tokenPixelSize = tokenUnits * gridSize
+
+    // Token position in pixels
+    const tokenX = token.gridX * gridSize
+    const tokenY = token.gridY * gridSize
+
+    // Check if token overlaps with presentation bounds
+    return (
+      tokenX + tokenPixelSize > presentationBounds.x &&
+      tokenX < presentationBounds.x + presentationBounds.width &&
+      tokenY + tokenPixelSize > presentationBounds.y &&
+      tokenY < presentationBounds.y + presentationBounds.height
+    )
+  }
+
+  // Split and sort tokens: in-bounds first when presenting
+  const { tokensInBounds, tokensOutOfBounds } = useMemo(() => {
+    if (!encounter || !isPresenting) {
+      return { tokensInBounds: encounter?.tokens ?? [], tokensOutOfBounds: [] }
+    }
+
+    const inBounds: Token[] = []
+    const outOfBounds: Token[] = []
+
+    encounter.tokens.forEach((token) => {
+      if (isTokenInBounds(token)) {
+        inBounds.push(token)
+      } else {
+        outOfBounds.push(token)
+      }
+    })
+
+    return { tokensInBounds: inBounds, tokensOutOfBounds: outOfBounds }
+  }, [encounter?.tokens, isPresenting, presentationBounds, encounter?.map?.gridSettings.gridSize])
+
   if (!encounter) return null
 
   return (
@@ -323,184 +605,62 @@ export function TokenPanel() {
             </p>
           </div>
         ) : (
-          <ul
-            className="space-y-1.5 max-h-[400px] overflow-y-auto scrollbar-stable"
-            role="list"
-            aria-label="Token list"
-          >
-            {encounter.tokens.map((token) => {
-              const isSelected = selection?.tokenIds?.includes(token.id)
-              const hpPercent = token.stats.maxHp > 0
-                ? token.stats.currentHp / token.stats.maxHp
-                : 1
-              const hpStatus =
-                hpPercent > 0.5 ? 'healthy' : hpPercent > 0.25 ? 'injured' : 'critical'
+          <div className="max-h-[400px] overflow-y-auto scrollbar-stable">
+            {/* Tokens in presentation bounds (or all tokens when not presenting) */}
+            <ul
+              className="space-y-1.5"
+              role="list"
+              aria-label={isPresenting ? "Tokens in view" : "Token list"}
+            >
+              {tokensInBounds.map((token) => (
+                <TokenListItem
+                  key={token.id}
+                  token={token}
+                  isSelected={selection?.tokenIds?.includes(token.id) ?? false}
+                  onSelect={selectToken}
+                  onQuickHpChange={handleQuickHpChange}
+                  onOpenHpModal={handleOpenHpModal}
+                  onToggleHidden={(id) => updateToken(id, { hidden: !token.hidden })}
+                  onLocate={handleLocateToken}
+                  onEdit={handleEditToken}
+                  onDelete={handleDeleteToken}
+                />
+              ))}
+            </ul>
 
-              return (
-                <li key={token.id} role="listitem">
-                  <div
-                    onClick={() => selectToken(token.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        selectToken(token.id)
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={isSelected}
-                    aria-label={`${token.name}, ${token.type}, ${token.stats.currentHp} of ${token.stats.maxHp} HP, ${isSelected ? 'selected' : 'not selected'}`}
-                    className={`p-2.5 rounded-lg cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      isSelected
-                        ? 'bg-primary/15 ring-1 ring-primary/60'
-                        : 'bg-muted/60 hover:bg-muted'
-                    }`}
-                  >
-                    {/* Title row with type icon and AC on right */}
-                    <div className="flex items-center gap-2 mb-2">
-                      <div
-                        className="w-3 h-3 rounded-full flex-shrink-0 ring-1 ring-white/10"
-                        style={{ backgroundColor: token.color }}
-                        aria-hidden="true"
-                      />
-                      <div className="text-sm font-medium truncate leading-tight flex-1" title={token.name}>
-                        {token.name}
-                      </div>
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <Tooltip content={token.type === TokenType.PlayerCharacter ? 'Player Character' : token.type === TokenType.NonPlayerCharacter ? 'NPC' : token.type}>
-                          <Icon
-                            name={
-                              token.type === TokenType.PlayerCharacter ? 'user' :
-                              token.type === TokenType.NonPlayerCharacter ? 'users' :
-                              token.type === TokenType.Monster ? 'skull' : 'box'
-                            }
-                            size={14}
-                            aria-label={token.type}
-                          />
-                        </Tooltip>
-                        <span className="text-xs tabular-nums">AC {token.stats.armorClass}</span>
-                      </div>
-                    </div>
-
-                    {/* Controls row: HP on left, action buttons on right */}
-                    <div className="flex items-center justify-between gap-2">
-                      {/* HP controls */}
-                      {token.stats.maxHp > 0 ? (
-                        <div className="flex items-center" role="group" aria-label={`HP controls for ${token.name}`}>
-                          <Tooltip content="Reduce HP by 1">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleQuickHpChange(token.id, -1)
-                              }}
-                              className="w-7 h-7 text-sm font-bold bg-secondary/80 rounded-l-md hover:bg-destructive hover:text-destructive-foreground active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:z-10"
-                              aria-label={`Decrease HP for ${token.name}`}
-                            >
-                              −
-                            </button>
-                          </Tooltip>
-                          <Tooltip content="Click to enter damage/healing amount">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleOpenHpModal(token)
-                              }}
-                              className={`min-w-[52px] h-7 px-2 text-xs font-medium bg-secondary/80 hover:bg-secondary text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:z-10 tabular-nums ${
-                                hpStatus === 'critical' ? 'text-destructive' : ''
-                              }`}
-                              aria-label={`${token.name} HP: ${token.stats.currentHp} of ${token.stats.maxHp}. Click to adjust.`}
-                            >
-                              {token.stats.currentHp}/{token.stats.maxHp}
-                            </button>
-                          </Tooltip>
-                          <Tooltip content="Increase HP by 1">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleQuickHpChange(token.id, 1)
-                              }}
-                              className="w-7 h-7 text-sm font-bold bg-secondary/80 rounded-r-md hover:bg-success hover:text-white active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:z-10"
-                              aria-label={`Increase HP for ${token.name}`}
-                            >
-                              +
-                            </button>
-                          </Tooltip>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground/60">No HP</span>
-                      )}
-
-                      {/* Action buttons */}
-                      <div className="flex gap-1" role="group" aria-label={`Actions for ${token.name}`}>
-                        <Tooltip content="Locate on map">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleLocateToken(token.id)
-                            }}
-                            className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/80 active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            aria-label={`Locate ${token.name} on map`}
-                          >
-                            <Icon name="crosshair" size={14} />
-                          </button>
-                        </Tooltip>
-                        <Tooltip content="Edit token">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleEditToken(token.id)
-                            }}
-                            className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/80 active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            aria-label={`Edit ${token.name}`}
-                          >
-                            <Icon name="edit" size={14} />
-                          </button>
-                        </Tooltip>
-                        <Tooltip content="Delete token">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteToken(token.id, token.name)
-                            }}
-                            className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-destructive hover:text-destructive-foreground active:scale-95 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            aria-label={`Delete ${token.name}`}
-                          >
-                            <Icon name="trash" size={14} />
-                          </button>
-                        </Tooltip>
-                      </div>
-                    </div>
-
-                    {/* HP bar */}
-                    {token.stats.maxHp > 0 && (
-                      <div
-                        className="mt-2 h-1 bg-secondary/40 rounded-full overflow-hidden"
-                        role="progressbar"
-                        aria-valuenow={token.stats.currentHp}
-                        aria-valuemin={0}
-                        aria-valuemax={token.stats.maxHp}
-                        aria-label={`${token.name} health: ${token.stats.currentHp} of ${token.stats.maxHp}`}
-                      >
-                        <div
-                          className={`h-full rounded-full transition-all duration-200 ${
-                            hpStatus === 'healthy'
-                              ? 'bg-success'
-                              : hpStatus === 'injured'
-                                ? 'bg-warning'
-                                : 'bg-destructive'
-                          }`}
-                          style={{
-                            width: `${hpPercent * 100}%`,
-                            transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)' /* ease-out-expo */
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
+            {/* Separator and out-of-bounds tokens when presenting */}
+            {isPresenting && tokensOutOfBounds.length > 0 && (
+              <>
+                <div className="flex items-center gap-2 my-3 px-1">
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                    Outside view ({tokensOutOfBounds.length})
+                  </span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+                <ul
+                  className="space-y-1.5 opacity-60"
+                  role="list"
+                  aria-label="Tokens outside presentation view"
+                >
+                  {tokensOutOfBounds.map((token) => (
+                    <TokenListItem
+                      key={token.id}
+                      token={token}
+                      isSelected={selection?.tokenIds?.includes(token.id) ?? false}
+                      onSelect={selectToken}
+                      onQuickHpChange={handleQuickHpChange}
+                      onOpenHpModal={handleOpenHpModal}
+                      onToggleHidden={(id) => updateToken(id, { hidden: !token.hidden })}
+                      onLocate={handleLocateToken}
+                      onEdit={handleEditToken}
+                      onDelete={handleDeleteToken}
+                    />
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
         )}
       </section>
 

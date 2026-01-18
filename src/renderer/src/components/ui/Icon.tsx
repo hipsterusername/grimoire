@@ -1,5 +1,75 @@
+export type IconName =
+  | 'cursor'
+  | 'hand'
+  | 'eye'
+  | 'eye-off'
+  | 'ruler'
+  | 'save'
+  | 'upload'
+  | 'grid'
+  | 'chevron-left'
+  | 'chevron-right'
+  | 'chevron-down'
+  | 'chevron-up'
+  | 'x'
+  | 'plus'
+  | 'minus'
+  | 'trash'
+  | 'edit'
+  | 'arrow-left'
+  | 'arrow-right'
+  | 'play'
+  | 'stop'
+  | 'dice'
+  | 'sort'
+  | 'menu'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'fit-screen'
+  | 'warning'
+  | 'spinner'
+  | 'user'
+  | 'users'
+  | 'skull'
+  | 'box'
+  | 'book'
+  | 'copy'
+  | 'image'
+  | 'monitor'
+  | 'monitor-off'
+  | 'frame'
+  | 'circle'
+  | 'square'
+  | 'brush'
+  | 'check'
+  | 'folder'
+  | 'folder-open'
+  | 'download'
+  | 'settings'
+  | 'map'
+  | 'search'
+  | 'crosshair'
+  | 'alert-triangle'
+  | 'help-circle'
+  | 'keyboard'
+  | 'mouse-pointer'
+  | 'sparkles'
+  | 'refresh'
+  | 'sun'
+  | 'moon'
+  | 'tree'
+  | 'mountain'
+  | 'shield'
+  | 'flame'
+  | 'star'
+  | 'crown'
+  | 'lock'
+  | 'door'
+  | 'beer'
+  | 'shopping-bag'
+
 interface IconProps {
-  name: string
+  name: IconName | string
   className?: string
   size?: number
 }
@@ -357,6 +427,146 @@ const icons: Record<string, React.ReactNode> = {
       strokeLinejoin="round"
       strokeWidth={2}
       d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+    />
+  ),
+  'help-circle': (
+    <>
+      <circle cx="12" cy="12" r="10" strokeWidth={2} />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"
+      />
+      <circle cx="12" cy="17" r="0.5" fill="currentColor" strokeWidth={0} />
+    </>
+  ),
+  'keyboard': (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M4 6h16a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2zm3 4h.01M11 10h.01M15 10h.01M7 14h10"
+    />
+  ),
+  'mouse-pointer': (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"
+    />
+  ),
+  'sparkles': (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+    />
+  ),
+  refresh: (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+    />
+  ),
+  sun: (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+    />
+  ),
+  moon: (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+    />
+  ),
+  tree: (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 22v-6m0 0l-4-6h8l-4 6zm0-6l-3-5h6l-3 5zm0-5l-2-4h4l-2 4z"
+    />
+  ),
+  mountain: (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M3 19h18l-6-10-4 5-3-4-5 9z"
+    />
+  ),
+  shield: (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+    />
+  ),
+  flame: (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"
+    />
+  ),
+  star: (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+    />
+  ),
+  crown: (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M3 17l3-9 4 4 2-8 2 8 4-4 3 9H3zM4 21h16"
+    />
+  ),
+  lock: (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+    />
+  ),
+  door: (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M8 4H6a2 2 0 00-2 2v12a2 2 0 002 2h2M16 4h2a2 2 0 012 2v12a2 2 0 01-2 2h-2M12 2v20M15 12h.01"
+    />
+  ),
+  beer: (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M5 4h10a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2zm12 4h2a2 2 0 012 2v4a2 2 0 01-2 2h-2M7 8v6m3-6v6"
+    />
+  ),
+  'shopping-bag': (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
     />
   )
 }

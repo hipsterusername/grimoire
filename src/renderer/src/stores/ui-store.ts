@@ -12,9 +12,22 @@ type ModalType =
   | 'token-image-picker'
   | 'template-editor'
   | 'asset-management'
+  | 'help'
   | null
 
 type PanelType = 'encounter' | 'tokens' | 'initiative' | 'map' | 'library'
+
+interface QuickConditionState {
+  tokenId: string
+  screenX: number
+  screenY: number
+}
+
+interface ContextMenuState {
+  tokenId: string
+  screenX: number
+  screenY: number
+}
 
 interface UIState {
   // Modals
@@ -28,6 +41,12 @@ interface UIState {
   // Token editor
   editingTokenId: string | null
 
+  // Quick condition panel
+  quickCondition: QuickConditionState | null
+
+  // Token context menu
+  contextMenu: ContextMenuState | null
+
   // Actions
   openModal: (modal: ModalType, data?: Record<string, unknown>) => void
   closeModal: () => void
@@ -37,6 +56,12 @@ interface UIState {
   toggleSidebar: () => void
 
   setEditingToken: (tokenId: string | null) => void
+
+  openQuickCondition: (tokenId: string, screenX: number, screenY: number) => void
+  closeQuickCondition: () => void
+
+  openContextMenu: (tokenId: string, screenX: number, screenY: number) => void
+  closeContextMenu: () => void
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -45,6 +70,8 @@ export const useUIStore = create<UIState>((set) => ({
   activePanels: ['encounter', 'tokens'],
   sidebarCollapsed: false,
   editingTokenId: null,
+  quickCondition: null,
+  contextMenu: null,
 
   openModal: (modal, data = {}) =>
     set({
@@ -75,5 +102,15 @@ export const useUIStore = create<UIState>((set) => ({
       sidebarCollapsed: !state.sidebarCollapsed
     })),
 
-  setEditingToken: (tokenId) => set({ editingTokenId: tokenId })
+  setEditingToken: (tokenId) => set({ editingTokenId: tokenId }),
+
+  openQuickCondition: (tokenId, screenX, screenY) =>
+    set({ quickCondition: { tokenId, screenX, screenY } }),
+
+  closeQuickCondition: () => set({ quickCondition: null }),
+
+  openContextMenu: (tokenId, screenX, screenY) =>
+    set({ contextMenu: { tokenId, screenX, screenY } }),
+
+  closeContextMenu: () => set({ contextMenu: null })
 }))

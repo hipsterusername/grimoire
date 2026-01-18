@@ -1,7 +1,7 @@
 import { useRef, useCallback, useEffect, useMemo, useState } from 'react'
 import { Stage, Layer, Rect } from 'react-konva'
 import type Konva from 'konva'
-import { useEncounterStore, useCanvasStore, usePresentationStore, useUIStore } from '../../stores'
+import { useEncounterStore, useCanvasStore, usePresentationStore, useUIStore, useLibraryStore } from '../../stores'
 import { MapLayer } from './layers/MapLayer'
 import { GridLayer } from './layers/GridLayer'
 import { TokenLayer } from './layers/TokenLayer'
@@ -9,6 +9,8 @@ import { FogOfWarLayer } from './layers/FogOfWarLayer'
 import { FogBrush } from './tools/FogBrush'
 import { PresentationBounds } from './tools/PresentationBounds'
 import { MovementMeasure } from './tools/MovementMeasure'
+import { QuickConditionPanel } from './QuickConditionPanel'
+import { TokenContextMenu } from './TokenContextMenu'
 import { Icon } from '../ui/Icon'
 
 interface BattleMapCanvasProps {
@@ -38,6 +40,8 @@ export function BattleMapCanvas({ width, height }: BattleMapCanvasProps) {
   const { setZoom, setPan, setPanning, clearSelection, resetZoom, setLastClickedCell, zoomToFit } = useCanvasStore()
 
   const openModal = useUIStore((s) => s.openModal)
+  const quickCondition = useUIStore((s) => s.quickCondition)
+  const contextMenu = useUIStore((s) => s.contextMenu)
 
   // Track space key and middle mouse for alternative panning
   const [isSpaceHeld, setIsSpaceHeld] = useState(false)
@@ -249,6 +253,9 @@ export function BattleMapCanvas({ width, height }: BattleMapCanvasProps) {
   const isPresenting = usePresentationStore((s) => s.isPresenting)
   const presentationBounds = usePresentationStore((s) => s.bounds)
 
+  // Get library assets to sync to presentation window
+  const libraryAssets = useLibraryStore((s) => s.library.assets)
+
   // Function to sync state - presentation view derives current turn from encounter state
   const doSyncState = useCallback(() => {
     if (!encounter) return
@@ -259,9 +266,10 @@ export function BattleMapCanvas({ width, height }: BattleMapCanvasProps) {
       viewBounds: presentationBounds,
       showFogOfWar: true,
       showInitiative: true,
-      selectedTokenId: null // Presentation view derives this from combat state
+      selectedTokenId: null, // Presentation view derives this from combat state
+      libraryAssets // Include library assets for token images
     })
-  }, [encounter, presentationBounds, syncState])
+  }, [encounter, presentationBounds, syncState, libraryAssets])
 
   // Listen for state requests from presentation window
   useEffect(() => {
@@ -395,6 +403,20 @@ export function BattleMapCanvas({ width, height }: BattleMapCanvasProps) {
         </div>
       </div>
     )}
+
+    {/* Quick condition panel overlay */}
+    {quickCondition && (
+      <QuickConditionPanel
+        tokenId={quickCondition.tokenId}
+        screenX={quickCondition.screenX}
+        screenY={quickCondition.screenY}
+        containerWidth={width}
+        containerHeight={height}
+      />
+    )}
+
+    {/* Token context menu overlay */}
+    {contextMenu && <TokenContextMenu />}
     </div>
   )
 }

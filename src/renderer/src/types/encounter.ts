@@ -37,6 +37,7 @@ export interface TokenCondition {
   name: string
   icon?: string
   color?: string
+  duration?: number // Turns remaining (undefined = permanent)
 }
 
 export interface Token {
@@ -54,6 +55,7 @@ export interface Token {
   conditions: TokenCondition[]
   notes?: string
   visible: boolean
+  hidden?: boolean // DM-only: hides token from initiative tracker and presentation view
   createdAt: string
   updatedAt: string
 }

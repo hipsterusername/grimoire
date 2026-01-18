@@ -108,12 +108,14 @@ export function Toolbar() {
   const zoomOut = useCanvasStore((s) => s.zoomOut)
   const resetZoom = useCanvasStore((s) => s.resetZoom)
   const view = useCanvasStore((s) => s.view)
+  const selection = useCanvasStore((s) => s.selection)
 
   const isPresenting = usePresentationStore((s) => s.isPresenting)
   const startPresentation = usePresentationStore((s) => s.startPresentation)
   const stopPresentation = usePresentationStore((s) => s.stopPresentation)
 
   const openModal = useUIStore((s) => s.openModal)
+  const openQuickCondition = useUIStore((s) => s.openQuickCondition)
 
   const [isSaving, setIsSaving] = useState(false)
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
@@ -168,12 +170,36 @@ export function Toolbar() {
           return
         }
         setTool(tool)
+        return
+      }
+
+      // 'C' key opens quick condition panel for selected token
+      if (e.key.toLowerCase() === 'c' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const selectedTokenId = selection?.tokenIds?.[0]
+        if (selectedTokenId && encounter) {
+          const token = encounter.tokens.find((t) => t.id === selectedTokenId)
+          if (token) {
+            const gridSize = encounter.map?.gridSettings?.gridSize ?? 50
+            // Calculate position relative to canvas container
+            const tokenCenterX = (token.gridX + 0.5) * gridSize
+            const tokenCenterY = (token.gridY + 0.5) * gridSize
+            const canvasX = tokenCenterX * view.zoom + view.panX
+            const canvasY = tokenCenterY * view.zoom + view.panY
+            openQuickCondition(selectedTokenId, canvasX, canvasY)
+          }
+        }
+      }
+
+      // '?' key opens help modal
+      if ((e.key === '?' || (e.key === '/' && e.shiftKey)) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault()
+        openModal('help')
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [setTool, isFogEnabled, saveEncounter])
+  }, [setTool, isFogEnabled, saveEncounter, selection, encounter, view.zoom, view.panX, view.panY, openQuickCondition, openModal])
 
   // Listen for presentation window being closed externally
   useEffect(() => {
@@ -398,6 +424,17 @@ export function Toolbar() {
               aria-label="Open settings"
             >
               <Icon name="settings" size={16} />
+            </button>
+          </Tooltip>
+
+          {/* Help */}
+          <Tooltip content="Help & Shortcuts" shortcut="?">
+            <button
+              onClick={() => openModal('help')}
+              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Open help and keyboard shortcuts"
+            >
+              <Icon name="help-circle" size={16} />
             </button>
           </Tooltip>
         </div>

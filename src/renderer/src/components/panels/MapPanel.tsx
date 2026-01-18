@@ -288,48 +288,29 @@ export function MapPanel() {
               </Tooltip>
             </div>
 
-            {/* Replace map options */}
+            {/* Replace map option */}
             <div className="pt-3 border-t border-border">
-              <p className="text-xs text-muted-foreground mb-2">Replace map:</p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => openModal('map-upload')}
-                  className="flex-1 min-h-[36px] px-3 py-1.5 text-xs font-medium bg-muted rounded hover:bg-muted/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center justify-center gap-1.5"
-                >
-                  <Icon name="upload" size={14} />
-                  Upload
-                </button>
-                <button
-                  onClick={() => openModal('grid-generator')}
-                  className="flex-1 min-h-[36px] px-3 py-1.5 text-xs font-medium bg-muted rounded hover:bg-muted/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center justify-center gap-1.5"
-                >
-                  <Icon name="grid" size={14} />
-                  Generate
-                </button>
-              </div>
+              <button
+                onClick={() => openModal('map-upload')}
+                className="w-full min-h-[36px] px-3 py-1.5 text-xs font-medium bg-muted rounded hover:bg-muted/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center justify-center gap-1.5"
+              >
+                <Icon name="upload" size={14} />
+                Replace Map
+              </button>
             </div>
           </div>
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              No map loaded. Upload an image or generate a grid.
+              No map loaded. Upload an image to get started.
             </p>
-            <div className="space-y-2">
-              <button
-                onClick={() => openModal('map-upload')}
-                className="w-full min-h-[44px] px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center justify-center gap-2"
-              >
-                <Icon name="upload" size={16} />
-                Upload Map Image
-              </button>
-              <button
-                onClick={() => openModal('grid-generator')}
-                className="w-full min-h-[44px] px-4 py-2 text-sm font-medium bg-muted rounded-lg hover:bg-muted/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center justify-center gap-2"
-              >
-                <Icon name="grid" size={16} />
-                Generate Grid
-              </button>
-            </div>
+            <button
+              onClick={() => openModal('map-upload')}
+              className="w-full min-h-[44px] px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex items-center justify-center gap-2"
+            >
+              <Icon name="upload" size={16} />
+              Upload Map Image
+            </button>
           </div>
         )}
 

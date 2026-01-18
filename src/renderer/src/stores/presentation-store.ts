@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
+import type { Asset } from '../types'
 
 export interface PresentationBounds {
   x: number
@@ -29,6 +30,7 @@ export interface PresentationState {
   showFogOfWar: boolean
   showInitiative: boolean
   selectedTokenId: string | null
+  libraryAssets?: Asset[] // Assets needed for token images
 }
 
 interface PresentationStore {

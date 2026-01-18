@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
-import type { Encounter, Token, MapData, FogRevealArea } from '../types'
+import type { Encounter, Token, MapData, FogRevealArea, TokenCondition } from '../types'
 import { createDefaultEncounter, DEFAULT_FOG_OF_WAR } from '../types'
 import { useCampaignStore } from './campaign-store'
 
@@ -23,8 +23,13 @@ interface EncounterState {
   addToken: (token: Omit<Token, 'id' | 'createdAt' | 'updatedAt'>) => void
   updateToken: (id: string, updates: Partial<Token>) => void
   removeToken: (id: string) => void
+  duplicateToken: (id: string) => void
   moveToken: (id: string, gridX: number, gridY: number) => void
   updateTokenHp: (id: string, currentHp: number, tempHp?: number) => void
+
+  // Actions - Conditions
+  addCondition: (tokenId: string, condition: Omit<TokenCondition, 'id'>) => void
+  removeCondition: (tokenId: string, conditionId: string) => void
 
   // Actions - Map
   setMap: (map: MapData) => void
@@ -208,6 +213,75 @@ export const useEncounterStore = create<EncounterState>()(
       })
     },
 
+    duplicateToken: (id) => {
+      set((state) => {
+        if (!state.encounter) return state
+
+        const sourceToken = state.encounter.tokens.find((t) => t.id === id)
+        if (!sourceToken) return state
+
+        // Find an empty cell near the source token
+        const occupiedCells = new Set(
+          state.encounter.tokens.map((t) => `${t.gridX},${t.gridY}`)
+        )
+
+        // Spiral search for empty cell
+        let newX = sourceToken.gridX + 1
+        let newY = sourceToken.gridY
+        const directions = [
+          { dx: 1, dy: 0 },
+          { dx: 0, dy: 1 },
+          { dx: -1, dy: 0 },
+          { dx: 0, dy: -1 }
+        ]
+        let x = sourceToken.gridX
+        let y = sourceToken.gridY
+        let steps = 1
+        let dirIndex = 0
+        let stepsInDir = 0
+        let turnCount = 0
+
+        for (let i = 0; i < 100; i++) {
+          x += directions[dirIndex].dx
+          y += directions[dirIndex].dy
+          stepsInDir++
+
+          if (x >= 0 && y >= 0 && !occupiedCells.has(`${x},${y}`)) {
+            newX = x
+            newY = y
+            break
+          }
+
+          if (stepsInDir >= steps) {
+            stepsInDir = 0
+            dirIndex = (dirIndex + 1) % 4
+            turnCount++
+            if (turnCount % 2 === 0) {
+              steps++
+            }
+          }
+        }
+
+        const newToken: Token = {
+          ...sourceToken,
+          id: crypto.randomUUID(),
+          name: `${sourceToken.name} (Copy)`,
+          gridX: newX,
+          gridY: newY,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+
+        return {
+          encounter: {
+            ...state.encounter,
+            tokens: [...state.encounter.tokens, newToken]
+          },
+          isDirty: true
+        }
+      })
+    },
+
     moveToken: (id, gridX, gridY) => {
       set((state) => {
         if (!state.encounter) return state
@@ -242,6 +316,56 @@ export const useEncounterStore = create<EncounterState>()(
                       currentHp: Math.max(0, Math.min(currentHp, t.stats.maxHp)),
                       tempHp: tempHp ?? t.stats.tempHp
                     },
+                    updatedAt: new Date().toISOString()
+                  }
+                : t
+            )
+          },
+          isDirty: true
+        }
+      })
+    },
+
+    // Condition actions
+    addCondition: (tokenId, condition) => {
+      set((state) => {
+        if (!state.encounter) return state
+
+        const newCondition: TokenCondition = {
+          ...condition,
+          id: crypto.randomUUID()
+        }
+
+        return {
+          encounter: {
+            ...state.encounter,
+            tokens: state.encounter.tokens.map((t) =>
+              t.id === tokenId
+                ? {
+                    ...t,
+                    conditions: [...t.conditions, newCondition],
+                    updatedAt: new Date().toISOString()
+                  }
+                : t
+            )
+          },
+          isDirty: true
+        }
+      })
+    },
+
+    removeCondition: (tokenId, conditionId) => {
+      set((state) => {
+        if (!state.encounter) return state
+
+        return {
+          encounter: {
+            ...state.encounter,
+            tokens: state.encounter.tokens.map((t) =>
+              t.id === tokenId
+                ? {
+                    ...t,
+                    conditions: t.conditions.filter((c) => c.id !== conditionId),
                     updatedAt: new Date().toISOString()
                   }
                 : t
@@ -506,6 +630,34 @@ export const useEncounterStore = create<EncounterState>()(
         const orderLength = state.encounter.initiativeOrder.length
         if (orderLength === 0) return state
 
+        // Get the token whose turn is ending (conditions expire at end of their turn)
+        const currentTokenId = state.encounter.initiativeOrder[state.encounter.currentTurnIndex]
+
+        // Process conditions for the token whose turn is ending
+        const updatedTokens = state.encounter.tokens.map((t) => {
+          if (t.id !== currentTokenId) return t
+
+          // Decrement duration for timed conditions and remove expired ones
+          const updatedConditions = t.conditions
+            .map((c) => {
+              if (c.duration === undefined) return c // Permanent condition
+              return { ...c, duration: c.duration - 1 }
+            })
+            .filter((c) => c.duration === undefined || c.duration > 0)
+
+          // Only update token if conditions changed
+          if (updatedConditions.length === t.conditions.length &&
+              updatedConditions.every((c, i) => c.duration === t.conditions[i].duration)) {
+            return t
+          }
+
+          return {
+            ...t,
+            conditions: updatedConditions,
+            updatedAt: new Date().toISOString()
+          }
+        })
+
         const nextIndex = (state.encounter.currentTurnIndex + 1) % orderLength
         const newRound =
           nextIndex === 0
@@ -515,6 +667,7 @@ export const useEncounterStore = create<EncounterState>()(
         return {
           encounter: {
             ...state.encounter,
+            tokens: updatedTokens,
             currentTurnIndex: nextIndex,
             roundNumber: newRound
           },

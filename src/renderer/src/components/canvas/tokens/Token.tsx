@@ -5,6 +5,7 @@ import type Konva from 'konva'
 import type { Token as TokenType } from '../../../types'
 import { SIZE_TO_GRID_UNITS, CreatureSize } from '../../../types'
 import { TokenHealthBar } from './TokenHealthBar'
+import { ConditionIndicators } from './ConditionIndicators'
 import { useEncounterStore, useCanvasStore, useUIStore, useLibraryStore } from '../../../stores'
 
 interface TokenProps {
@@ -21,12 +22,14 @@ export function Token({ token, gridSize, isSelected, onSelect }: TokenProps) {
   const tokens = useEncounterStore((s) => s.encounter?.tokens ?? [])
   const activeTool = useCanvasStore((s) => s.activeTool)
   const isPanning = useCanvasStore((s) => s.isPanning)
+  const view = useCanvasStore((s) => s.view)
   const setDragging = useCanvasStore((s) => s.setDragging)
   const startMovementMeasure = useCanvasStore((s) => s.startMovementMeasure)
   const updateMovementMeasure = useCanvasStore((s) => s.updateMovementMeasure)
   const clearMovementMeasure = useCanvasStore((s) => s.clearMovementMeasure)
   const setEditingToken = useUIStore((s) => s.setEditingToken)
   const openModal = useUIStore((s) => s.openModal)
+  const openContextMenu = useUIStore((s) => s.openContextMenu)
   const library = useLibraryStore((s) => s.library)
 
   // Check if a cell is occupied by another token (not this one)
@@ -157,6 +160,20 @@ export function Token({ token, gridSize, isSelected, onSelect }: TokenProps) {
   // Token is draggable only when select tool is active and not in panning mode
   const isDraggable = activeTool === 'select' && !isPanning
   const radius = tokenSize / 2
+
+  const handleContextMenu = useCallback((e: Konva.KonvaEventObject<PointerEvent>) => {
+    e.evt.preventDefault()
+    e.cancelBubble = true
+
+    // Calculate position for context menu (relative to canvas container)
+    // Get the token's center in canvas coordinates
+    const tokenCenterX = x + radius + offset
+    const tokenCenterY = y + radius + offset
+    // Convert to screen position within canvas (accounting for zoom and pan)
+    const canvasX = tokenCenterX * view.zoom + view.panX
+    const canvasY = tokenCenterY * view.zoom + view.panY
+    openContextMenu(token.id, canvasX, canvasY)
+  }, [x, radius, offset, view.zoom, view.panX, view.panY, openContextMenu, token.id])
   const healthBarWidth = Math.max(tokenSize, 40)
 
   // HP percentage for coloring
@@ -171,6 +188,9 @@ export function Token({ token, gridSize, isSelected, onSelect }: TokenProps) {
       ? '#facc15'
       : '#ef4444'
 
+  // Visual opacity: hidden tokens are semi-transparent to indicate DM-only visibility
+  const tokenOpacity = token.hidden ? 0.5 : token.visible ? 1 : 0.5
+
   return (
     <Group
       ref={groupRef}
@@ -184,7 +204,8 @@ export function Token({ token, gridSize, isSelected, onSelect }: TokenProps) {
       onTap={handleClick}
       onDblClick={handleDblClick}
       onDblTap={handleDblClick}
-      opacity={token.visible ? 1 : 0.5}
+      onContextMenu={handleContextMenu}
+      opacity={tokenOpacity}
     >
       {/* Token base */}
       {hasImage ? (
@@ -241,12 +262,25 @@ export function Token({ token, gridSize, isSelected, onSelect }: TokenProps) {
         />
       )}
 
+      {/* Hidden indicator ring - dashed orange outline */}
+      {token.hidden && (
+        <Circle
+          x={radius + offset}
+          y={radius + offset}
+          radius={radius + 6}
+          stroke="#f59e0b"
+          strokeWidth={2}
+          dash={[4, 4]}
+          opacity={0.9}
+        />
+      )}
+
       {/* Selection ring */}
       {isSelected && (
         <Circle
           x={radius + offset}
           y={radius + offset}
-          radius={radius + 4}
+          radius={radius + (token.hidden ? 10 : 4)}
           stroke="#FFD700"
           strokeWidth={2}
           dash={[5, 5]}
@@ -279,35 +313,28 @@ export function Token({ token, gridSize, isSelected, onSelect }: TokenProps) {
         y={tokenSize + 4 + offset}
       />
 
-      {/* Name label */}
+      {/* Name label - extends beyond token for readability, scales with token size */}
       <Text
         text={token.name}
-        fontSize={11}
+        fontSize={Math.max(8, tokenSize * 0.14)}
+        fontFamily="Inter, system-ui, sans-serif"
+        fontStyle="600"
         fill="#FFFFFF"
         stroke="#000000"
-        strokeWidth={0.5}
-        x={offset}
-        y={tokenSize + 18 + offset}
-        width={tokenSize}
+        strokeWidth={Math.max(2, tokenSize * 0.04)}
+        fillAfterStrokeEnabled={true}
+        x={offset - tokenSize * 0.5}
+        y={tokenSize + 16 + offset}
+        width={tokenSize * 2}
         align="center"
       />
 
-      {/* Condition indicators */}
-      {token.conditions.length > 0 && (
-        <Group x={tokenSize - 8 + offset} y={-4 + offset}>
-          {token.conditions.slice(0, 3).map((condition, i) => (
-            <Circle
-              key={condition.id}
-              x={0}
-              y={i * 12}
-              radius={5}
-              fill={condition.color ?? '#ef4444'}
-              stroke="#000"
-              strokeWidth={1}
-            />
-          ))}
-        </Group>
-      )}
+      {/* Condition indicators with icons */}
+      <ConditionIndicators
+        conditions={token.conditions}
+        tokenSize={tokenSize}
+        offset={offset}
+      />
     </Group>
   )
 }

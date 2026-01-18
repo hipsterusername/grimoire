@@ -69,6 +69,7 @@ export const KEYBOARD_SHORTCUTS = {
   pan: { key: 'H', label: 'H' },
   fogReveal: { key: 'R', label: 'R' },
   fogHide: { key: 'F', label: 'F' },
+  conditions: { key: 'C', label: 'C' },
   save: { key: 'S', label: 'Ctrl+S', ctrl: true },
   undo: { key: 'Z', label: 'Ctrl+Z', ctrl: true },
   redo: { key: 'Y', label: 'Ctrl+Y', ctrl: true }
@@ -125,3 +126,33 @@ export const VALIDATION = {
   maxAc: 99,
   maxInitiative: 99
 } as const
+
+// D&D 5e conditions and common buffs
+export const DND_CONDITIONS = [
+  // Standard D&D 5e conditions
+  { name: 'Blinded', color: '#6b7280', icon: 'eye-off' },
+  { name: 'Charmed', color: '#ec4899', icon: 'user' },
+  { name: 'Deafened', color: '#6b7280', icon: 'minus' },
+  { name: 'Frightened', color: '#a855f7', icon: 'alert-triangle' },
+  { name: 'Grappled', color: '#f97316', icon: 'hand' },
+  { name: 'Incapacitated', color: '#6b7280', icon: 'stop' },
+  { name: 'Invisible', color: '#06b6d4', icon: 'eye-off' },
+  { name: 'Paralyzed', color: '#eab308', icon: 'stop' },
+  { name: 'Petrified', color: '#78716c', icon: 'box' },
+  { name: 'Poisoned', color: '#22c55e', icon: 'skull' },
+  { name: 'Prone', color: '#f97316', icon: 'arrow-left' },
+  { name: 'Restrained', color: '#f97316', icon: 'x' },
+  { name: 'Stunned', color: '#eab308', icon: 'warning' },
+  { name: 'Unconscious', color: '#1f2937', icon: 'minus' },
+  // Common buffs
+  { name: 'Blessed', color: '#fbbf24', icon: 'plus' },
+  { name: 'Concentrating', color: '#3b82f6', icon: 'eye' },
+  { name: 'Hasted', color: '#22d3ee', icon: 'arrow-right' },
+  { name: 'Raging', color: '#ef4444', icon: 'warning' },
+  { name: 'Hunter\'s Mark', color: '#22c55e', icon: 'crosshair' },
+  { name: 'Hex', color: '#8b5cf6', icon: 'skull' },
+  { name: 'Shield of Faith', color: '#fbbf24', icon: 'circle' },
+  { name: 'Bless', color: '#fbbf24', icon: 'plus' },
+  { name: 'Guidance', color: '#14b8a6', icon: 'hand' },
+  { name: 'Bardic Inspiration', color: '#ec4899', icon: 'dice' }
+] as const

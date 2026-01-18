@@ -4,6 +4,7 @@ import { TokenType } from '../../types'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/Tooltip'
+import { ConditionBadge } from '../ui/ConditionBadge'
 
 // Roll a d20 (1-20)
 function rollD20(): number {
@@ -24,11 +25,13 @@ export function InitiativePanel() {
   const [editValue, setEditValue] = useState('')
   const headingId = useId()
 
-  // Get tokens in initiative order, filtering out any missing tokens
+  // Get tokens in initiative order, filtering out hidden and missing tokens
   const tokensInOrder = useMemo(() => {
     if (!encounter) return []
 
-    const tokenMap = new Map(encounter.tokens.map((t) => [t.id, t]))
+    // Filter out hidden tokens - they shouldn't appear in initiative tracker
+    const visibleTokens = encounter.tokens.filter((t) => !t.hidden)
+    const tokenMap = new Map(visibleTokens.map((t) => [t.id, t]))
 
     // If in combat, use the initiative order
     if (encounter.inCombat && encounter.initiativeOrder.length > 0) {
@@ -37,8 +40,8 @@ export function InitiativePanel() {
         .filter((t): t is NonNullable<typeof t> => t !== undefined)
     }
 
-    // Otherwise, show all tokens sorted by initiative (if set) or alphabetically
-    return [...encounter.tokens].sort((a, b) => {
+    // Otherwise, show all visible tokens sorted by initiative (if set) or alphabetically
+    return [...visibleTokens].sort((a, b) => {
       // Tokens with initiative come first
       const aInit = a.stats.initiative ?? -999
       const bInit = b.stats.initiative ?? -999
@@ -48,15 +51,17 @@ export function InitiativePanel() {
     })
   }, [encounter])
 
-  // Roll initiative for all tokens (d20 + modifier)
+  // Roll initiative for all visible (non-hidden) tokens (d20 + modifier)
   const handleRollAll = () => {
     if (!encounter) return
 
-    encounter.tokens.forEach((token) => {
-      const roll = rollD20()
-      const modifier = token.stats.initiativeModifier ?? 0
-      setInitiative(token.id, roll + modifier)
-    })
+    encounter.tokens
+      .filter((token) => !token.hidden)
+      .forEach((token) => {
+        const roll = rollD20()
+        const modifier = token.stats.initiativeModifier ?? 0
+        setInitiative(token.id, roll + modifier)
+      })
 
     // Auto-sort after rolling
     setTimeout(() => sortInitiative(), 50)
@@ -120,7 +125,7 @@ export function InitiativePanel() {
     ? encounter.tokens.find((t) => t.id === encounter.initiativeOrder[encounter.currentTurnIndex])
     : null
 
-  const hasAnyInitiative = encounter.tokens.some((t) => t.stats.initiative !== undefined)
+  const hasAnyInitiative = encounter.tokens.some((t) => !t.hidden && t.stats.initiative !== undefined)
 
   return (
     <>
@@ -205,6 +210,18 @@ export function InitiativePanel() {
                       {currentTurnToken.name}
                     </span>
                   </div>
+                  {/* Show active conditions */}
+                  {currentTurnToken.conditions.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {currentTurnToken.conditions.map((condition) => (
+                        <ConditionBadge
+                          key={condition.id}
+                          condition={condition}
+                          size="sm"
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -273,8 +290,24 @@ export function InitiativePanel() {
                       <div className="text-sm font-medium truncate" title={token.name}>
                         {token.name}
                       </div>
-                      <div className={`text-xs ${isCurrentTurn ? 'text-white/70' : 'text-muted-foreground'}`}>
-                        {token.type === TokenType.PlayerCharacter ? 'PC' : token.type === TokenType.Monster ? 'Monster' : token.type}
+                      <div className={`flex items-center gap-1 text-xs ${isCurrentTurn ? 'text-white/70' : 'text-muted-foreground'}`}>
+                        <span>{token.type === TokenType.PlayerCharacter ? 'PC' : token.type === TokenType.Monster ? 'Monster' : token.type}</span>
+                        {/* Condition indicators */}
+                        {token.conditions.length > 0 && (
+                          <div className="flex items-center gap-0.5 ml-1">
+                            {token.conditions.slice(0, 3).map((condition) => (
+                              <Tooltip key={condition.id} content={`${condition.name}${condition.duration !== undefined ? ` (${condition.duration})` : ''}`}>
+                                <div
+                                  className="w-2 h-2 rounded-full"
+                                  style={{ backgroundColor: condition.color ?? '#ef4444' }}
+                                />
+                              </Tooltip>
+                            ))}
+                            {token.conditions.length > 3 && (
+                              <span className="text-[10px]">+{token.conditions.length - 3}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
