@@ -22,7 +22,7 @@
 Run tactical encounters without the overhead. Grimoire gives DMs a focused tool for managing battle maps, tokens, and initiative—nothing more, nothing less.
 
 <p align="center">
-<img width="1261" height="688" alt="image" src="https://github.com/user-attachments/assets/3e5f6867-9354-4e0e-9656-90fcad515cce" />
+<img width="1261" height="688" alt="image" src="https://github.com/user-attachments/assets/fe5bc67d-4ece-4cc3-9870-35638ef6cdf2" />
 </p>
 
 ## Features
